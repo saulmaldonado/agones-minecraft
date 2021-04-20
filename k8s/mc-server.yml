@@ -1,0 +1,42 @@
+apiVersion: 'agones.dev/v1'
+kind: GameServer
+metadata:
+  generateName: 'mc-server-' # Generates a unique name for GameServer and Pod
+spec:
+  container: mc-server # Minecraft server container name
+  ports:
+    - name: mc
+      # "Dynamic" (default) the system allocates a free hostPort for the gameserver (default 7000-8000), for game clients to connect to
+      portPolicy: Dynamic
+      # The name of the container to open the port on. Defaults to the game server container if omitted or empty.
+      container: mc-server
+      # the port that is being opened on the game server process
+      containerPort: 25565
+      # Minecraft uses TCP to connect players
+      protocol: TCP
+  # Health checking for the running game server
+  health:
+    # Number of seconds after the container has started before health check is initiated.
+    # This should match the initial-delay flag for agones-mc-monitor which defaults to 60s
+    initialDelaySeconds: 60
+    # If the `Health()` function doesn't get called at least once every period (seconds), then
+    # the game server is not healthy.
+    # This should at least match the interval flag for agones-mc-monitor which defaults to 10s
+    periodSeconds: 12
+    # Minimum consecutive failures for the health probe to be considered failed after having succeeded.
+    # Defaults to 3. Minimum value is 1
+    # This should match the attempts flag for agones-mc-monitor which defaults to 5
+    failureThreshold: 5
+  template:
+    spec:
+      containers:
+        - name: mc-server
+          image: itzg/minecraft-server # Minecraft server image
+          imagePullPolicy: Always
+          env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-server
+            - name: EULA
+              value: "TRUE"
+
+        - name: mc-monitor
+          image: saulmaldonado/agones-mc-monitor # Agones SDK sidecar
+          imagePullPolicy: Always
