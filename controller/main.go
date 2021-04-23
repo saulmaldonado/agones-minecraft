@@ -2,46 +2,74 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	controller "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func main() {
+type GameServerReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+}
 
-	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{})
-	if err != nil {
-		log.Fatal(err)
-	}
+func main() {
+	scheme := runtime.NewScheme()
+	agonesv1.AddToScheme(scheme)
+	clientGoScheme.AddToScheme(scheme)
 
 	log.Println("Setting up controller")
 
-	ctrl, err := controller.New("mc-controller", mgr, controller.Options{
-		Reconciler: reconcile.Func(func(c context.Context, r reconcile.Request) (reconcile.Result, error) {
-			log.Println(r.NamespacedName)
-
-			return reconcile.Result{}, nil
-		}),
+	manager, err := controller.NewManager(config.GetConfigOrDie(), controller.Options{
+		Scheme: scheme,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = ctrl.Watch(&source.Kind{Type: &agonesv1.GameServer{}}, &handler.EnqueueRequestForObject{})
+
+	err = controller.NewControllerManagedBy(manager).
+		For(&agonesv1.GameServer{}).
+		Complete(&GameServerReconciler{manager.GetClient(), manager.GetScheme()})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Println("Starting manager")
-
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+	if err := manager.Start(controller.SetupSignalHandler()); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	gs := &agonesv1.GameServer{}
+
+	err := r.Get(ctx, req.NamespacedName, gs)
+	if errors.IsNotFound(err) {
+		log.Println("could not find GameServer")
+		return reconcile.Result{}, nil
+	}
+
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("could not get GameServer")
+	}
+
+	if gs.Annotations["agones-mc/hostname"] != "" && gs.Annotations["agones-mc/externalDNS"] == "" {
+		log.Println("Adding external DNS")
+		hostname := gs.Annotations["agones-mc/hostname"]
+		gs.Annotations["agones-mc/externalDNS"] = gs.Name + "." + hostname
+		if err := r.Update(ctx, gs); err != nil {
+			return reconcile.Result{}, err
+		}
+		log.Println("GameServer updated")
+	}
+
+	return reconcile.Result{}, nil
 }

@@ -1,6 +1,8 @@
 apiVersion: 'agones.dev/v1'
 kind: GameServer
 metadata:
+  annotations: 
+    agones-mc/hostname: saulmaldonado.me 
   generateName: 'mc-server-' # Generates a unique name for GameServer and Pod
 spec:
   container: mc-server # Minecraft server container name
