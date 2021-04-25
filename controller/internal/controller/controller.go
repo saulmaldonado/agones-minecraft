@@ -32,6 +32,7 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 	gs := &agonesv1.GameServer{}
 
 	if err := r.Get(ctx, req.NamespacedName, gs); err != nil {
+
 		if errors.IsNotFound(err) {
 			r.log.Error(err, "Could not find GameServer")
 			return reconcile.Result{}, nil
@@ -46,22 +47,21 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		return reconcile.Result{}, nil
 	}
 
-	hostname, hostnameFound := getAnnotation(HostnameAnnotation, gs)
-	_, externalDnsFound := getAnnotation(ExternalDnsAnnotation, gs)
+	exists := externalDnsExists(gs)
+	hostname, hostnameFound := getHostnameAnnotation(gs)
 
-	if externalDnsFound {
+	if exists {
 		r.log.Info(fmt.Sprintf("External DNS set for %s", gs.Name))
 		return reconcile.Result{}, nil
 	}
 
 	if hostnameFound {
-		_, err := r.dns.SetExternalDns(hostname, gs)
 
-		if err != nil {
+		if res, err := r.dns.SetExternalDns(hostname, gs); err != nil {
 
 			switch err.(type) {
 			case *provider.DNSRecordExists:
-				r.log.Info(err.Error())
+				r.log.Info(err.Error(), "HTTPStatusCode", res.HTTPStatusCode)
 			default:
 				r.log.Error(err, "Error creating DNS records")
 				return reconcile.Result{}, nil
@@ -70,21 +70,32 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		}
 
 		r.Get(ctx, req.NamespacedName, gs)
-
-		if err := setAnnotation(ExternalDnsAnnotation, mcDns.JoinARecordName(hostname, gs.Name), gs); err != nil {
-			r.log.Error(err, "Error setting externalDNS annotation")
-			return reconcile.Result{}, nil
-		}
+		externalDns := setExternalDnsAnnotation(mcDns.JoinARecordName(hostname, gs.Name), gs)
 
 		if err := r.Update(ctx, gs); err != nil {
 			return reconcile.Result{}, err
 		}
-		r.log.Info("GameServer updated")
-	} else {
-		r.log.Info(fmt.Sprintf("Not hostname annotation for %s", gs.Name))
+
+		r.log.Info(fmt.Sprintf("GameServer %s externalDNS set to %s", gs.Name, externalDns))
+		return reconcile.Result{}, nil
 	}
 
+	r.log.Info(fmt.Sprintf("No hostname annotation for %s", gs.Name))
 	return reconcile.Result{}, nil
+}
+
+func externalDnsExists(gs *agonesv1.GameServer) bool {
+	_, ok := getAnnotation(ExternalDnsAnnotation, gs)
+	return ok
+}
+
+func getHostnameAnnotation(gs *agonesv1.GameServer) (string, bool) {
+	return getAnnotation(HostnameAnnotation, gs)
+}
+
+func setExternalDnsAnnotation(recordName string, gs *agonesv1.GameServer) string {
+	setAnnotation(ExternalDnsAnnotation, recordName, gs)
+	return recordName
 }
 
 func getAnnotation(suffix string, gs *agonesv1.GameServer) (string, bool) {
@@ -98,15 +109,9 @@ func getAnnotation(suffix string, gs *agonesv1.GameServer) (string, bool) {
 	return hostname, true
 }
 
-func setAnnotation(suffix string, value string, gs *agonesv1.GameServer) error {
+func setAnnotation(suffix string, value string, gs *agonesv1.GameServer) {
 	annotation := fmt.Sprintf("%s/%s", AnnotationPrefix, ExternalDnsAnnotation)
-
-	if value == "" || strings.TrimSpace(value) == "" {
-		return fmt.Errorf("value for %s annotation empty", annotation)
-	}
-
 	gs.Annotations[annotation] = value
-	return nil
 }
 
 func isServerAllocated(gs *agonesv1.GameServer) bool {

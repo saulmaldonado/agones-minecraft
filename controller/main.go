@@ -6,9 +6,9 @@ import (
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	ctrl "github.com/saulmaldonado/agones-minecraft/controller/internal/controller"
+	schm "github.com/saulmaldonado/agones-minecraft/controller/internal/controller/scheme"
 	"github.com/saulmaldonado/agones-minecraft/controller/internal/provider/google"
 	"k8s.io/apimachinery/pkg/runtime"
-	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	controller "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -31,13 +31,10 @@ func main() {
 	scheme := runtime.NewScheme()
 	log := zap.New()
 
-	if err := agonesv1.AddToScheme(scheme); err != nil {
-		log.Error(err, "Error Adding agones.dev/v1 to scheme")
-		os.Exit(1)
-	}
+	log.Info("Adding scheme")
 
-	if err := clientGoScheme.AddToScheme(scheme); err != nil {
-		log.Error(err, "Error adding client-go clientset to scheme")
+	if err := schm.AddToScheme(scheme); err != nil {
+		log.Error(err, "Error adding scheme")
 		os.Exit(1)
 	}
 
@@ -54,6 +51,7 @@ func main() {
 
 	manager, err := controller.NewManager(config.GetConfigOrDie(), controller.Options{
 		Scheme: scheme,
+		Logger: log,
 	})
 	if err != nil {
 		log.Error(err, "Error setting up manager")
