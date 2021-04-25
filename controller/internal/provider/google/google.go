@@ -2,7 +2,6 @@ package google
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
@@ -31,10 +30,7 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 	change := dns.Change{}
 
 	aRecord := NewARecordSet(hostname, gs, DefaultTtl)
-	srvRecord, err := NewSrvRecordSet(hostname, gs, DefaultTtl)
-	if err != nil {
-		return provider.ServerResponse{}, err
-	}
+	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl)
 
 	change.Additions = []*dns.ResourceRecordSet{aRecord, srvRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
@@ -63,10 +59,7 @@ func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameSe
 	change := dns.Change{}
 
 	aRecord := NewARecordSet(hostname, gs, DefaultTtl)
-	srvRecord, err := NewSrvRecordSet(hostname, gs, DefaultTtl)
-	if err != nil {
-		return provider.ServerResponse{}, err
-	}
+	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl)
 
 	change.Deletions = []*dns.ResourceRecordSet{srvRecord, aRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
@@ -84,18 +77,16 @@ func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameSe
 	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
 }
 
-func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) (*dns.ResourceRecordSet, error) {
-	ports := gs.Status.Ports
-
-	if ports == nil {
-		return nil, fmt.Errorf("server ports not allocated")
-	}
+func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
 
 	port := gs.Status.Ports[0].Port
-	recordName := mcDns.JoinSrvRecordName(hostname, gs.Name)
-	resourceRecord := mcDns.JoinSrvRR(recordName, uint16(port), DefaultPriority, DefaultWeight)
 
-	return &dns.ResourceRecordSet{Type: SRV, Name: recordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}, nil
+	srvRecordName := mcDns.JoinSrvRecordName(hostname, gs.Name)
+	aRecordName := mcDns.JoinARecordName(hostname, gs.Name)
+
+	resourceRecord := mcDns.JoinSrvRR(aRecordName, uint16(port), DefaultPriority, DefaultWeight)
+
+	return &dns.ResourceRecordSet{Type: SRV, Name: srvRecordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}
 }
 
 func NewARecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
