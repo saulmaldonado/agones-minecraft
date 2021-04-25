@@ -32,10 +32,14 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 	gs := agonesv1.GameServer{}
 
 	if err := r.getGameServer(ctx, req.NamespacedName, &gs); err != nil {
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
-	exists := findeExternalDnsAnnotation(&gs)
+	if !r.gameServerIsReady(&gs) {
+		return reconcile.Result{}, nil
+	}
+
+	exists := findExternalDnsAnnotation(&gs)
 	hostname, hostnameFound := getHostnameAnnotation(&gs)
 
 	if exists {
@@ -43,9 +47,11 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 			if err := r.cleanUpGameServer(hostname, &gs); err != nil {
 				return reconcile.Result{}, err
 			}
+
+			return reconcile.Result{}, nil
 		}
 
-		r.log.Info(fmt.Sprintf("External DNS set for %s", gs.Name))
+		r.log.Info(fmt.Sprintf("ExternalDNS set for %s", gs.Name))
 		return reconcile.Result{}, nil
 	}
 
@@ -84,7 +90,7 @@ func (r *GameServerReconciler) setGameServerDNS(ctx context.Context, hostname st
 		return err
 	}
 
-	r.log.Info(fmt.Sprintf("GameServer %s externalDNS set to %s", gs.Name, externalDns))
+	r.log.Info(fmt.Sprintf("GameServer %s ExternalDNS set to %s", gs.Name, externalDns))
 	return nil
 }
 
@@ -103,8 +109,13 @@ func (r *GameServerReconciler) getGameServer(ctx context.Context, namespacedName
 	return nil
 }
 
-func isGameServerDeleted(gs *agonesv1.GameServer) bool {
-	return !gs.ObjectMeta.DeletionTimestamp.IsZero()
+func (r *GameServerReconciler) gameServerIsReady(gs *agonesv1.GameServer) bool {
+	if gs.Status.Address == "" && len(gs.Status.Ports) == 0 {
+		r.log.Info("GameServer not ready to set ExternalDNS", "GameServer name", gs.Name)
+		return false
+	}
+
+	return true
 }
 
 func (r *GameServerReconciler) cleanUpGameServer(hostname string, gs *agonesv1.GameServer) error {
@@ -117,10 +128,14 @@ func (r *GameServerReconciler) cleanUpGameServer(hostname string, gs *agonesv1.G
 		}
 	}
 
-	r.log.Info(fmt.Sprintf("GameServer %s externalDNS records removed", gs.Name))
+	r.log.Info(fmt.Sprintf("GameServer %s ExternalDNS records removed", gs.Name))
 	return nil
 }
 
 func NewReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, dns provider.DnsClient) reconcile.Reconciler {
 	return &GameServerReconciler{client, scheme, log, dns}
+}
+
+func isGameServerDeleted(gs *agonesv1.GameServer) bool {
+	return !gs.ObjectMeta.DeletionTimestamp.IsZero()
 }

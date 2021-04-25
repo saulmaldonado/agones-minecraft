@@ -16,7 +16,7 @@ func setExternalDnsAnnotation(recordName string, gs *agonesv1.GameServer) string
 	return recordName
 }
 
-func findeExternalDnsAnnotation(gs *agonesv1.GameServer) bool {
+func findExternalDnsAnnotation(gs *agonesv1.GameServer) bool {
 	_, ok := getAnnotation(ExternalDnsAnnotation, gs)
 	return ok
 }
