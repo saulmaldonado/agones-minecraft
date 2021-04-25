@@ -29,12 +29,12 @@ type GameServerReconciler struct {
 }
 
 func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	gs := &agonesv1.GameServer{}
+	gs := agonesv1.GameServer{}
 
-	if err := r.Get(ctx, req.NamespacedName, gs); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, &gs); err != nil {
 
 		if errors.IsNotFound(err) {
-			r.log.Error(err, "Could not find GameServer")
+			r.log.Info(fmt.Sprintf("Could not find GameServer %s", req.NamespacedName))
 			return reconcile.Result{}, nil
 		}
 
@@ -42,37 +42,52 @@ func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		return reconcile.Result{}, err
 	}
 
-	if ready := isServerAllocated(gs); !ready {
+	if ready := isServerAllocated(&gs); !ready {
 		r.log.Info("Waiting for port/address allocation")
 		return reconcile.Result{}, nil
 	}
 
-	exists := externalDnsExists(gs)
-	hostname, hostnameFound := getHostnameAnnotation(gs)
+	exists := externalDnsExists(&gs)
+	hostname, hostnameFound := getHostnameAnnotation(&gs)
 
 	if exists {
-		r.log.Info(fmt.Sprintf("External DNS set for %s", gs.Name))
+		if gs.ObjectMeta.DeletionTimestamp.IsZero() {
+			r.log.Info(fmt.Sprintf("External DNS set for %s", gs.Name))
+			return reconcile.Result{}, nil
+		}
+
+		if res, err := r.dns.RemoveExternalDns(hostname, &gs); err != nil {
+			switch e := err.(type) {
+			case *provider.DNSRecordNonExistent:
+				r.log.Info(err.Error(), "HTTPStatusCode", res.HTTPStatusCode, "ServerError", e.ServerError)
+			default:
+				r.log.Error(err, fmt.Sprintf("Error deleting DNS record for %s", gs.Name))
+				return reconcile.Result{}, err
+			}
+
+		}
+
+		r.log.Info(fmt.Sprintf("GameServer %s externalDNS records removed", gs.Name))
 		return reconcile.Result{}, nil
 	}
 
 	if hostnameFound {
-
-		if res, err := r.dns.SetExternalDns(hostname, gs); err != nil {
+		if res, err := r.dns.SetExternalDns(hostname, &gs); err != nil {
 
 			switch err.(type) {
 			case *provider.DNSRecordExists:
 				r.log.Info(err.Error(), "HTTPStatusCode", res.HTTPStatusCode)
 			default:
 				r.log.Error(err, "Error creating DNS records")
-				return reconcile.Result{}, nil
+				return reconcile.Result{}, err
 			}
 
 		}
 
-		r.Get(ctx, req.NamespacedName, gs)
-		externalDns := setExternalDnsAnnotation(mcDns.JoinARecordName(hostname, gs.Name), gs)
+		r.Get(ctx, req.NamespacedName, &gs)
+		externalDns := setExternalDnsAnnotation(mcDns.JoinARecordName(hostname, gs.Name), &gs)
 
-		if err := r.Update(ctx, gs); err != nil {
+		if err := r.Update(ctx, &gs); err != nil {
 			return reconcile.Result{}, err
 		}
 

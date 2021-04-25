@@ -2,6 +2,7 @@ package google
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
@@ -26,15 +27,12 @@ var (
 
 func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
 	change := dns.Change{}
-	port := gs.Status.Ports[0].Port
 
-	aRecordName := mcDns.JoinARecordName(hostname, gs.Name)
-	srvRecordName := mcDns.JoinSrvRecordName(hostname, gs.Name)
-
-	srvResourceRecord := mcDns.JoinSrvRR(srvRecordName, uint16(port), DefaultPriority, DefaultWeight)
-
-	srvRecord := NewSrvRecordSet(srvRecordName, srvResourceRecord, DefaultTtl)
-	aRecord := NewARecordSet(aRecordName, gs.Status.Address, DefaultTtl)
+	aRecord := NewARecordSet(hostname, gs, DefaultTtl)
+	srvRecord, err := NewSrvRecordSet(hostname, gs, DefaultTtl)
+	if err != nil {
+		return provider.ServerResponse{}, err
+	}
 
 	change.Additions = []*dns.ResourceRecordSet{aRecord, srvRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
@@ -45,7 +43,7 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 			res := provider.ServerResponse{HTTPStatusCode: apiError.Code, Header: apiError.Header}
 
 			if apiError.Code == http.StatusConflict || apiError.Code == http.StatusNotModified {
-				return res, &provider.DNSRecordExists{Record: aRecordName}
+				return res, &provider.DNSRecordExists{Record: aRecord.Name}
 			}
 
 			return res, apiError
@@ -59,11 +57,48 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 	return serverRes, nil
 }
 
-func NewSrvRecordSet(srvRecordName string, srvResourceRecord string, ttl int64) *dns.ResourceRecordSet {
-	return &dns.ResourceRecordSet{Type: "SRV", Name: srvRecordName, Rrdatas: []string{srvResourceRecord}, Ttl: ttl}
+func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
+	change := dns.Change{}
+
+	aRecord := NewARecordSet(hostname, gs, DefaultTtl)
+	srvRecord, err := NewSrvRecordSet(hostname, gs, DefaultTtl)
+	if err != nil {
+		return provider.ServerResponse{}, err
+	}
+
+	change.Deletions = []*dns.ResourceRecordSet{srvRecord, aRecord}
+	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
+
+	if err != nil {
+		apiError, ok := err.(*googleapi.Error)
+		if ok {
+			return provider.ServerResponse{HTTPStatusCode: apiError.Code, Header: apiError.Header},
+				&provider.DNSRecordNonExistent{Records: []string{aRecord.Name, srvRecord.Name}, ServerError: err}
+		}
+
+		return provider.ServerResponse{}, err
+	}
+
+	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
 }
 
-func NewARecordSet(recordName string, hostExternalIp string, ttl int64) *dns.ResourceRecordSet {
+func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) (*dns.ResourceRecordSet, error) {
+	ports := gs.Status.Ports
+
+	if ports == nil {
+		return nil, fmt.Errorf("server ports not allocated")
+	}
+
+	port := gs.Status.Ports[0].Port
+	recordName := mcDns.JoinSrvRecordName(hostname, gs.Name)
+	resourceRecord := mcDns.JoinSrvRR(recordName, uint16(port), DefaultPriority, DefaultWeight)
+	return &dns.ResourceRecordSet{Type: "SRV", Name: recordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}, nil
+}
+
+func NewARecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
+	recordName := mcDns.JoinARecordName(hostname, gs.Name)
+	hostExternalIp := gs.Status.Address
+
 	return &dns.ResourceRecordSet{Type: "A", Name: recordName, Rrdatas: []string{hostExternalIp}, Ttl: ttl}
 }
 
