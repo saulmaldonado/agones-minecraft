@@ -19,10 +19,12 @@ type GoogleDnsClient struct {
 	*dns.Service
 }
 
-var (
-	DefaultTtl      int64 = 60 * 30
-	DefaultPriority int   = 0
-	DefaultWeight   int   = 0
+const (
+	DefaultTtl      int64  = 60 * 30
+	DefaultPriority int    = 0
+	DefaultWeight   int    = 0
+	SRV             string = "SRV"
+	A               string = "A"
 )
 
 func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
@@ -38,23 +40,23 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
 	if err != nil {
-		apiError, ok := err.(*googleapi.Error)
-		if ok {
-			res := provider.ServerResponse{HTTPStatusCode: apiError.Code, Header: apiError.Header}
 
-			if apiError.Code == http.StatusConflict || apiError.Code == http.StatusNotModified {
+		switch e := err.(type) {
+		case *googleapi.Error:
+			res := provider.ServerResponse{HTTPStatusCode: e.Code, Header: e.Header}
+
+			if e.Code == http.StatusConflict || e.Code == http.StatusNotModified {
 				return res, &provider.DNSRecordExists{Record: aRecord.Name}
 			}
 
-			return res, apiError
+			return res, e
+		default:
+			return provider.ServerResponse{}, e
 		}
 
-		return provider.ServerResponse{}, err
 	}
 
-	serverRes := provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}
-
-	return serverRes, nil
+	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
 }
 
 func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
@@ -68,15 +70,15 @@ func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameSe
 
 	change.Deletions = []*dns.ResourceRecordSet{srvRecord, aRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
-
 	if err != nil {
-		apiError, ok := err.(*googleapi.Error)
-		if ok {
-			return provider.ServerResponse{HTTPStatusCode: apiError.Code, Header: apiError.Header},
-				&provider.DNSRecordNonExistent{Records: []string{aRecord.Name, srvRecord.Name}, ServerError: err}
-		}
 
-		return provider.ServerResponse{}, err
+		switch e := err.(type) {
+		case *googleapi.Error:
+			return provider.ServerResponse{HTTPStatusCode: e.Code, Header: e.Header},
+				&provider.DNSRecordNonExistent{Records: []string{aRecord.Name, srvRecord.Name}, ServerError: e}
+		default:
+			return provider.ServerResponse{}, e
+		}
 	}
 
 	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
@@ -92,14 +94,15 @@ func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) (*dns.
 	port := gs.Status.Ports[0].Port
 	recordName := mcDns.JoinSrvRecordName(hostname, gs.Name)
 	resourceRecord := mcDns.JoinSrvRR(recordName, uint16(port), DefaultPriority, DefaultWeight)
-	return &dns.ResourceRecordSet{Type: "SRV", Name: recordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}, nil
+
+	return &dns.ResourceRecordSet{Type: SRV, Name: recordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}, nil
 }
 
 func NewARecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
 	recordName := mcDns.JoinARecordName(hostname, gs.Name)
 	hostExternalIp := gs.Status.Address
 
-	return &dns.ResourceRecordSet{Type: "A", Name: recordName, Rrdatas: []string{hostExternalIp}, Ttl: ttl}
+	return &dns.ResourceRecordSet{Type: A, Name: recordName, Rrdatas: []string{hostExternalIp}, Ttl: ttl}
 }
 
 func NewDnsClient(projectId, managedZone string) (*GoogleDnsClient, error) {
