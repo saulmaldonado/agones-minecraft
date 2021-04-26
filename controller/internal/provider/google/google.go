@@ -31,7 +31,8 @@ const (
 func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
 	change := dns.Change{}
 
-	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl)
+	nodeARecord := mcDns.JoinARecordName(hostname, gs.Status.NodeName)
+	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl, nodeARecord)
 
 	change.Additions = []*dns.ResourceRecordSet{srvRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
@@ -59,17 +60,17 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
 	change := dns.Change{}
 
-	aRecord := NewARecordSet(hostname, gs.Status.Address, gs.Name, DefaultTtl)
-	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl)
+	nodeARecord := mcDns.JoinARecordName(hostname, gs.Status.NodeName)
+	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl, nodeARecord)
 
-	change.Deletions = []*dns.ResourceRecordSet{srvRecord, aRecord}
+	change.Deletions = []*dns.ResourceRecordSet{srvRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 	if err != nil {
 
 		switch e := err.(type) {
 		case *googleapi.Error:
 			return provider.ServerResponse{HTTPStatusCode: e.Code, Header: e.Header},
-				&provider.DNSRecordNonExistent{Records: []string{aRecord.Name, srvRecord.Name}, ServerError: e}
+				&provider.DNSRecordNonExistent{Records: []string{srvRecord.Name, srvRecord.Name}, ServerError: e}
 		default:
 			return provider.ServerResponse{}, e
 		}
@@ -116,14 +117,12 @@ func (c *GoogleDnsClient) RemoveNodeExternalDns(hostname string, node *corev1.No
 	return nil
 }
 
-func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
-
+func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64, aRecordName string) *dns.ResourceRecordSet {
 	port := gs.Status.Ports[0].Port
 
 	srvRecordName := mcDns.JoinSrvRecordName(hostname, gs.Name)
-	aRecordName := mcDns.JoinARecordName(hostname, gs.Name)
 
-	resourceRecord := mcDns.JoinSrvRR(aRecordName, uint16(port), DefaultPriority, DefaultWeight)
+	resourceRecord := mcDns.JoinSrvRR(aRecordName, uint16(port), DefaultPriority, DefaultWeight, aRecordName)
 
 	return &dns.ResourceRecordSet{Type: SRV, Name: srvRecordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}
 }
