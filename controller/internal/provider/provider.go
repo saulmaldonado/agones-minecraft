@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type Config struct {
@@ -20,6 +21,8 @@ type ServerResponse struct {
 type DnsClient interface {
 	SetExternalDns(hostname string, gs *agonesv1.GameServer) (ServerResponse, error)
 	RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (ServerResponse, error)
+	SetNodeExternalDns(hostname string, node *corev1.Node) error
+	RemoveNodeExternalDns(hostname string, node *corev1.Node) error
 }
 
 type DNSRecordExists struct {

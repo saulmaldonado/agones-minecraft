@@ -8,6 +8,7 @@ import (
 	ctrl "github.com/saulmaldonado/agones-minecraft/controller/internal/controller"
 	schm "github.com/saulmaldonado/agones-minecraft/controller/internal/controller/scheme"
 	"github.com/saulmaldonado/agones-minecraft/controller/internal/provider/google"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	controller "sigs.k8s.io/controller-runtime"
@@ -16,8 +17,9 @@ import (
 )
 
 var (
-	ManagedZone string
-	ProjectID   string
+	ManagedZone  string
+	ProjectID    string
+	NodeHostname string
 )
 
 func init() {
@@ -58,13 +60,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info("Setting up controller")
+	log.Info("Setting up GameServer controller")
 
-	err = controller.NewControllerManagedBy(manager).
+	if err = controller.NewControllerManagedBy(manager).
 		For(&agonesv1.GameServer{}).
-		Complete(ctrl.NewReconciler(manager.GetClient(), manager.GetScheme(), log, dns))
-	if err != nil {
-		log.Error(err, "Error setting up controller")
+		Complete(ctrl.NewReconciler(manager.GetClient(), manager.GetScheme(), log, dns)); err != nil {
+
+		log.Error(err, "Error setting up GameServer controller")
+		os.Exit(1)
+	}
+
+	log.Info("Setting up Node controller")
+
+	if err := controller.NewControllerManagedBy(manager).
+		For(&corev1.Node{}).
+		Complete(ctrl.NewNodeReconciler(manager.GetClient(), manager.GetScheme(), log, dns)); err != nil {
+
+		log.Error(err, "Error setting up Node controller")
 		os.Exit(1)
 	}
 

@@ -5,12 +5,14 @@ import (
 	"net/http"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
+	"github.com/saulmaldonado/agones-minecraft/controller/internal/controller/scheme"
 	mcDns "github.com/saulmaldonado/agones-minecraft/controller/internal/dns"
 	"github.com/saulmaldonado/agones-minecraft/controller/internal/provider"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type GoogleDnsClient struct {
@@ -29,10 +31,9 @@ const (
 func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
 	change := dns.Change{}
 
-	aRecord := NewARecordSet(hostname, gs, DefaultTtl)
 	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl)
 
-	change.Additions = []*dns.ResourceRecordSet{aRecord, srvRecord}
+	change.Additions = []*dns.ResourceRecordSet{srvRecord}
 	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
 	if err != nil {
@@ -42,7 +43,7 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 			res := provider.ServerResponse{HTTPStatusCode: e.Code, Header: e.Header}
 
 			if e.Code == http.StatusConflict || e.Code == http.StatusNotModified {
-				return res, &provider.DNSRecordExists{Record: aRecord.Name}
+				return res, &provider.DNSRecordExists{Record: srvRecord.Name}
 			}
 
 			return res, e
@@ -58,7 +59,7 @@ func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServe
 func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
 	change := dns.Change{}
 
-	aRecord := NewARecordSet(hostname, gs, DefaultTtl)
+	aRecord := NewARecordSet(hostname, gs.Status.Address, gs.Name, DefaultTtl)
 	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl)
 
 	change.Deletions = []*dns.ResourceRecordSet{srvRecord, aRecord}
@@ -77,6 +78,44 @@ func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameSe
 	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
 }
 
+func (c *GoogleDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node) error {
+	change := dns.Change{}
+
+	externalIp, err := scheme.GetNodeExternalAddress(node)
+	if err != nil {
+		return err
+	}
+
+	aRecord := NewARecordSet(hostname, externalIp, node.Name, DefaultTtl)
+
+	change.Additions = []*dns.ResourceRecordSet{aRecord}
+
+	if _, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *GoogleDnsClient) RemoveNodeExternalDns(hostname string, node *corev1.Node) error {
+	change := dns.Change{}
+
+	externalIp, err := scheme.GetNodeExternalAddress(node)
+	if err != nil {
+		return err
+	}
+
+	aRecord := NewARecordSet(hostname, externalIp, node.Name, DefaultTtl)
+
+	change.Deletions = []*dns.ResourceRecordSet{aRecord}
+
+	if _, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
 
 	port := gs.Status.Ports[0].Port
@@ -89,10 +128,8 @@ func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.R
 	return &dns.ResourceRecordSet{Type: SRV, Name: srvRecordName, Rrdatas: []string{resourceRecord}, Ttl: ttl}
 }
 
-func NewARecordSet(hostname string, gs *agonesv1.GameServer, ttl int64) *dns.ResourceRecordSet {
-	recordName := mcDns.JoinARecordName(hostname, gs.Name)
-	hostExternalIp := gs.Status.Address
-
+func NewARecordSet(hostname string, hostExternalIp string, resourceName string, ttl int64) *dns.ResourceRecordSet {
+	recordName := mcDns.JoinARecordName(hostname, resourceName)
 	return &dns.ResourceRecordSet{Type: A, Name: recordName, Rrdatas: []string{hostExternalIp}, Ttl: ttl}
 }
 

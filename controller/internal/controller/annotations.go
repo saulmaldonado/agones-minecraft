@@ -4,26 +4,28 @@ import (
 	"fmt"
 	"strings"
 
-	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func getHostnameAnnotation(gs *agonesv1.GameServer) (string, bool) {
-	return getAnnotation(HostnameAnnotation, gs)
+func getHostnameAnnotation(obj client.Object) (string, bool) {
+	return getAnnotation(HostnameAnnotation, obj)
 }
 
-func setExternalDnsAnnotation(recordName string, gs *agonesv1.GameServer) string {
-	setAnnotation(ExternalDnsAnnotation, recordName, gs)
+func setExternalDnsAnnotation(recordName string, obj client.Object) string {
+	setAnnotation(ExternalDnsAnnotation, recordName, obj)
 	return recordName
 }
 
-func findExternalDnsAnnotation(gs *agonesv1.GameServer) bool {
-	_, ok := getAnnotation(ExternalDnsAnnotation, gs)
+func findExternalDnsAnnotation(obj client.Object) bool {
+	_, ok := getAnnotation(ExternalDnsAnnotation, obj)
 	return ok
 }
 
-func getAnnotation(suffix string, gs *agonesv1.GameServer) (string, bool) {
-	annotation := fmt.Sprintf("%s/%s", AnnotationPrefix, suffix)
-	hostname, ok := gs.Annotations[annotation]
+func getAnnotation(suffix string, obj client.Object) (string, bool) {
+	key := fmt.Sprintf("%s/%s", AnnotationPrefix, suffix)
+	annotations := obj.GetAnnotations()
+
+	hostname, ok := annotations[key]
 
 	if !ok || strings.TrimSpace(hostname) == "" {
 		return "", false
@@ -32,7 +34,8 @@ func getAnnotation(suffix string, gs *agonesv1.GameServer) (string, bool) {
 	return hostname, true
 }
 
-func setAnnotation(suffix string, value string, gs *agonesv1.GameServer) {
-	annotation := fmt.Sprintf("%s/%s", AnnotationPrefix, ExternalDnsAnnotation)
-	gs.Annotations[annotation] = value
+func setAnnotation(suffix string, value string, obj client.Object) {
+	key := fmt.Sprintf("%s/%s", AnnotationPrefix, ExternalDnsAnnotation)
+	annotations := obj.GetAnnotations()
+	annotations[key] = value
 }
