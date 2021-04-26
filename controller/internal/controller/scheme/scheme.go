@@ -50,3 +50,8 @@ type NoNodeExternalIP struct {
 func (e *NoNodeExternalIP) Error() string {
 	return fmt.Sprintf("%s has no external IP", e.NodeName)
 }
+
+func IsBeforePodCreated(gs *agonesv1.GameServer) bool {
+	state := gs.Status.State
+	return state == agonesv1.GameServerStatePortAllocation || state == agonesv1.GameServerStateCreating || state == agonesv1.GameServerStateStarting
+}

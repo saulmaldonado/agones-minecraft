@@ -19,10 +19,12 @@ type ServerResponse struct {
 }
 
 type DnsClient interface {
-	SetExternalDns(hostname string, gs *agonesv1.GameServer) (ServerResponse, error)
-	RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (ServerResponse, error)
+	SetGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error
+	RemoveGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error
 	SetNodeExternalDns(hostname string, node *corev1.Node) error
 	RemoveNodeExternalDns(hostname string, node *corev1.Node) error
+	IgnoreClientError(err error) error
+	IgnoreAlreadyExists(err error) error
 }
 
 type DNSRecordExists struct {

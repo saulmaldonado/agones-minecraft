@@ -7,6 +7,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var (
+	AnnotationPrefix      string = "agones-mc"
+	HostnameAnnotation    string = "hostname"
+	ExternalDnsAnnotation string = "externalDNS"
+)
+
 func getHostnameAnnotation(obj client.Object) (string, bool) {
 	return getAnnotation(HostnameAnnotation, obj)
 }
@@ -35,6 +41,7 @@ func getAnnotation(suffix string, obj client.Object) (string, bool) {
 }
 
 func setAnnotation(suffix string, value string, obj client.Object) {
+
 	key := fmt.Sprintf("%s/%s", AnnotationPrefix, ExternalDnsAnnotation)
 	annotations := obj.GetAnnotations()
 	annotations[key] = value

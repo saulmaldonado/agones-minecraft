@@ -12,8 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	controller "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 var (
@@ -63,8 +65,11 @@ func main() {
 	log.Info("Setting up GameServer controller")
 
 	if err = controller.NewControllerManagedBy(manager).
-		For(&agonesv1.GameServer{}).
-		Complete(ctrl.NewReconciler(manager.GetClient(), manager.GetScheme(), log, dns)); err != nil {
+		For(&agonesv1.GameServer{}).WithEventFilter(predicate.NewPredicateFuncs(func(object client.Object) bool {
+		gs := object.(*agonesv1.GameServer)
+		return !schm.IsBeforePodCreated(gs)
+	})).
+		Complete(ctrl.NewGameServerReconciler(manager.GetClient(), manager.GetScheme(), log, dns)); err != nil {
 
 		log.Error(err, "Error setting up GameServer controller")
 		os.Exit(1)

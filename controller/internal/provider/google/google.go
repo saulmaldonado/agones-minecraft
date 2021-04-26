@@ -2,7 +2,6 @@ package google
 
 import (
 	"context"
-	"net/http"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"github.com/saulmaldonado/agones-minecraft/controller/internal/controller/scheme"
@@ -26,57 +25,39 @@ const (
 	DefaultWeight   int    = 0
 	SRV             string = "SRV"
 	A               string = "A"
+	AlreadyExists   string = "alreadyExists"
 )
 
-func (c *GoogleDnsClient) SetExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
+func (c *GoogleDnsClient) SetGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
 	change := dns.Change{}
 
 	nodeARecord := mcDns.JoinARecordName(hostname, gs.Status.NodeName)
 	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl, nodeARecord)
 
 	change.Additions = []*dns.ResourceRecordSet{srvRecord}
-	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
+	_, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
 	if err != nil {
-
-		switch e := err.(type) {
-		case *googleapi.Error:
-			res := provider.ServerResponse{HTTPStatusCode: e.Code, Header: e.Header}
-
-			if e.Code == http.StatusConflict || e.Code == http.StatusNotModified {
-				return res, &provider.DNSRecordExists{Record: srvRecord.Name}
-			}
-
-			return res, e
-		default:
-			return provider.ServerResponse{}, e
-		}
-
+		return err
 	}
 
-	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
+	return nil
 }
 
-func (c *GoogleDnsClient) RemoveExternalDns(hostname string, gs *agonesv1.GameServer) (provider.ServerResponse, error) {
+func (c *GoogleDnsClient) RemoveGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
 	change := dns.Change{}
 
 	nodeARecord := mcDns.JoinARecordName(hostname, gs.Status.NodeName)
 	srvRecord := NewSrvRecordSet(hostname, gs, DefaultTtl, nodeARecord)
 
 	change.Deletions = []*dns.ResourceRecordSet{srvRecord}
-	res, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
-	if err != nil {
+	_, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
-		switch e := err.(type) {
-		case *googleapi.Error:
-			return provider.ServerResponse{HTTPStatusCode: e.Code, Header: e.Header},
-				&provider.DNSRecordNonExistent{Records: []string{srvRecord.Name, srvRecord.Name}, ServerError: e}
-		default:
-			return provider.ServerResponse{}, e
-		}
+	if err != nil {
+		return err
 	}
 
-	return provider.ServerResponse{HTTPStatusCode: res.HTTPStatusCode, Header: res.Header}, nil
+	return nil
 }
 
 func (c *GoogleDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node) error {
@@ -147,4 +128,23 @@ func NewDnsClient(projectId, managedZone string) (*GoogleDnsClient, error) {
 	config := provider.Config{GoogleProjectId: projectId, GoogleManagedZone: managedZone}
 
 	return &GoogleDnsClient{config: config, Service: dns}, nil
+}
+
+func (c *GoogleDnsClient) IgnoreClientError(err error) error {
+	if _, ok := err.(*googleapi.Error); ok {
+		return nil
+	}
+	return err
+}
+
+func (c *GoogleDnsClient) IgnoreAlreadyExists(err error) error {
+	if apiErr, ok := err.(*googleapi.Error); ok {
+		for _, e := range apiErr.Errors {
+			if e.Reason != AlreadyExists {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
