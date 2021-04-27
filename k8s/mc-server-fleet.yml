@@ -22,6 +22,8 @@ spec:
   template:
     # GameServer metadata
     metadata:
+      annotations:
+        agones-mc/hostname: <DOMAIN_NAME>
     spec:
       container: mc-server # Minecraft server container name
       ports:
@@ -39,7 +41,6 @@ spec:
           containers:
             - name: mc-server
               image: itzg/minecraft-server # Minecraft server image
-              imagePullPolicy: Always
               env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-server
                 - name: EULA
                   value: "TRUE"
