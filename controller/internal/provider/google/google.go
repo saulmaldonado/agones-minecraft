@@ -4,6 +4,7 @@ import (
 	"context"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
+	"cloud.google.com/go/compute/metadata"
 	"github.com/saulmaldonado/agones-minecraft/controller/internal/controller/scheme"
 	mcDns "github.com/saulmaldonado/agones-minecraft/controller/internal/dns"
 	"github.com/saulmaldonado/agones-minecraft/controller/internal/provider"
@@ -113,23 +114,6 @@ func NewARecordSet(hostname string, hostExternalIp string, resourceName string, 
 	return &dns.ResourceRecordSet{Type: A, Name: recordName, Rrdatas: []string{hostExternalIp}, Ttl: ttl}
 }
 
-func NewDnsClient(projectId, managedZone string) (*GoogleDnsClient, error) {
-	gcloud, err := google.DefaultClient(context.Background(), dns.NdevClouddnsReadwriteScope)
-	if err != nil {
-		return nil, err
-	}
-
-	dns, err := dns.NewService(context.Background(), option.WithHTTPClient(gcloud))
-
-	if err != nil {
-		return nil, err
-	}
-
-	config := provider.Config{GoogleProjectId: projectId, GoogleManagedZone: managedZone}
-
-	return &GoogleDnsClient{config: config, Service: dns}, nil
-}
-
 func (c *GoogleDnsClient) IgnoreClientError(err error) error {
 	if _, ok := err.(*googleapi.Error); ok {
 		return nil
@@ -147,4 +131,29 @@ func (c *GoogleDnsClient) IgnoreAlreadyExists(err error) error {
 	}
 
 	return nil
+}
+
+func NewDnsClient(managedZone, projectId string) (*GoogleDnsClient, error) {
+	gcloud, err := google.DefaultClient(context.Background(), dns.NdevClouddnsReadwriteScope)
+	if err != nil {
+		return nil, err
+	}
+
+	dns, err := dns.NewService(context.Background(), option.WithHTTPClient(gcloud))
+
+	if err != nil {
+		return nil, err
+	}
+
+	if projectId == "" {
+		GCEProjectId, err := metadata.ProjectID()
+		if err != nil {
+			return nil, err
+		}
+		projectId = GCEProjectId
+	}
+
+	config := provider.Config{GoogleProjectId: projectId, GoogleManagedZone: managedZone}
+
+	return &GoogleDnsClient{config: config, Service: dns}, nil
 }

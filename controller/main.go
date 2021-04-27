@@ -20,13 +20,13 @@ import (
 
 var (
 	ManagedZone  string
-	ProjectID    string
+	ProjectId    string
 	NodeHostname string
 )
 
 func init() {
 	flag.StringVar(&ManagedZone, "zone", "", "DNS zone that the controller will manage")
-	flag.StringVar(&ProjectID, "project", "", "Google project ID")
+	flag.StringVar(&ProjectId, "gcp-project", "", "GCP project id")
 
 	flag.Parse()
 }
@@ -44,7 +44,7 @@ func main() {
 
 	log.Info("Initializing DNS client")
 
-	dns, err := google.NewDnsClient(ProjectID, ManagedZone)
+	dns, err := google.NewDnsClient(ManagedZone, ProjectId)
 
 	if err != nil {
 		log.Error(err, "Error Initializing DNS client")
