@@ -38,7 +38,7 @@ kubectl describe --namespace agones-system pods
 
 ## 4. Install Custom Minecraft DNS Controller
 
-### [Controller Documentation](../controller)
+### [Controller Documentation](./controller)
 
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml
