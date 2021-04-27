@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func AddToScheme(scheme *runtime.Scheme) error {
@@ -54,4 +55,12 @@ func (e *NoNodeExternalIP) Error() string {
 func IsBeforePodCreated(gs *agonesv1.GameServer) bool {
 	state := gs.Status.State
 	return state == agonesv1.GameServerStatePortAllocation || state == agonesv1.GameServerStateCreating || state == agonesv1.GameServerStateStarting
+}
+
+func IsResourceDeleted(obj client.Object) bool {
+	return !obj.GetDeletionTimestamp().IsZero()
+}
+
+func GVKString(obj client.Object) string {
+	return obj.GetObjectKind().GroupVersionKind().String()
 }
