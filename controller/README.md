@@ -104,6 +104,63 @@ kubectl apply -f https://raw.githubusercontent.com/googleforgames/agones/release
 
 ### Installation
 
+`kubectl apply -f https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml`
+
+```yml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agones-mc-dns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agones-mc-dns
+rules:
+  - apiGroups: ['agones.dev']
+    resources: ['gameservers']
+    verbs: ['get', 'watch', 'list', 'update']
+  - apiGroups: ['']
+    resources: ['nodes']
+    verbs: ['get', 'watch', 'list', 'update']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agones-mc-dns-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: agones-mc-dns
+subjects:
+  - kind: ServiceAccount
+    name: agones-mc-dns
+    namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agones-mc-dns-controller
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: agones-mc-dns-controller
+  template:
+    metadata:
+      labels:
+        app: agones-mc-dns-controller
+    spec:
+      serviceAccountName: agones-mc-dns
+      containers:
+        - name: agones-mc-dns-controller
+          image: saulmaldonado/agones-mc-dns-controller
+          args:
+            - --zone=<MANAGED_ZONE> # Replace with name of DNS managed zone
+          imagePullPolicy: Always
+```
+
 #### Download from Docker Hub
 
 ```sh
