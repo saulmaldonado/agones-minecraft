@@ -36,14 +36,22 @@ kubectl apply -f https://raw.githubusercontent.com/googleforgames/agones/release
 kubectl describe --namespace agones-system pods
 ```
 
-## 4. Create Minecraft Server Fleet
+## 4. Install Custom Minecraft DNS Controller
+
+### [Controller Documentation](../controller)
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml
+```
+
+## 5. Deploy Minecraft GameServer Fleet
 
 ```sh
 kubectl apply -f k8s/mc-server-fleet.yml
 ```
 
-## 5. Get A GameServer IP
+## 6. List Minecraft GameServer Addresses
 
 ```sh
-kube get fleet mc-fleet
+kubectl get gs -o jsonpath='{.items[*].metadata.annotations.agones-mc/externalDNS}'
 ```
