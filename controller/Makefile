@@ -42,4 +42,4 @@ go-build:
 	go build -o $(BUILD_PATH)/controller main.go
 
 go-run:
-	go run main.go
+	go run main.go --gcp-project=$(GCP_PROJECT) --zone=$(MANAGED_ZONE)
