@@ -175,16 +175,23 @@ This controller takes advantage of dynamic host port allocation that Agones prov
 
 ### Nodes
 
-To provision an `A` record for Nodes, they need to contain a `agones-mc/hostname:` annotation that contains the domain for the current Managed Zone. This will indicate to the controller that the Node needs an `A` record.
+To provision an `A` record for Nodes, they need to have `agones-mc/hostname` annotation that contains the domain of the `zone` that the controller is managing. This will indicate to the controller that the Node needs an `A` record.
 
-This can be done using `kubectl`:
+Annotating Nodes can be done using `kubectl`:
 
 ```sh
 kubectl annotate node/<NODE_NAME> agones-mc/hostname=<DOMAIN>
 ```
 
-The `A` record are generated with the name `<NODE_NAME>.<DOMAIN>.`
+All Node that you intend to host GameServers one should have this annotation.
+
 New annotation with `agones-mc/externalDNS` will contain the new `A` record that points to the Node IP.
+
+Example:
+
+| Node Name                                  | hostname annotation | Resulting `A` Record                                   |
+| ------------------------------------------ | ------------------- | ------------------------------------------------------ |
+| `gke-minecraft-default-pool-79cd0803-42d7` | `example.com`       | `gke-minecraft-default-pool-79cd0803-42d7.example.com` |
 
 ### GameServer
 
@@ -216,7 +223,9 @@ Once the pod has been created, a new `SRV` will be generated with the format `_m
 
 A new annotation `agones-mc/externalDNS` will then be added to the GameServer containing the URL from which players can connect to.
 
-For example: `mc-server-cfwd7.saulmaldonado.me` will connect to the Minecraft GameServer named `mc-server-cfwd7` on its dynamically allocated port.
+| GameServer Name   | Port | annotation                        | Node `A` Record                                         | Resulting `SRV` Record                                                                                       | Minecraft Server URL        |
+| ----------------- | ---- | --------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| `mc-server-cfwd7` | 7908 | `agones-mc/hostname: example.com` | `gke-minecraft-default-pool-79cd0803-42d7.example.com.` | `_minecraft._tcp.mc-server-cfwd7.example.com 0 0 7908 gke-minecraft-default-pool-79cd0803-42d7.example.com.` | mc-server-cfwd7.example.com |
 
 #### [Full GameServer specification example](../k8s/mc-server.yml)
 
