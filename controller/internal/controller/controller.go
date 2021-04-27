@@ -23,16 +23,6 @@ type DnsReconciler struct {
 	dns    provider.DnsClient
 }
 
-func (r *DnsReconciler) getResource(ctx context.Context, namespacedName types.NamespacedName, obj client.Object) error {
-	err := r.Get(ctx, namespacedName, obj)
-
-	if err != nil && errors.IsNotFound(err) {
-		r.log.Info("Could not find resource", "Name", namespacedName.String())
-	}
-
-	return err
-}
-
 func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request, obj client.Object) (reconcile.Result, error) {
 	if err := r.getResource(ctx, req.NamespacedName, obj); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(err)
@@ -72,6 +62,16 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 	return reconcile.Result{}, nil
 }
 
+func (r *DnsReconciler) getResource(ctx context.Context, namespacedName types.NamespacedName, obj client.Object) error {
+	err := r.Get(ctx, namespacedName, obj)
+
+	if err != nil && errors.IsNotFound(err) {
+		r.log.Info("Could not find resource", "Name", namespacedName.String())
+	}
+
+	return err
+}
+
 func (r *DnsReconciler) cleanUpResource(hostname string, obj client.Object) error {
 	switch res := obj.(type) {
 	case *agonesv1.GameServer:
@@ -98,35 +98,10 @@ func (r *DnsReconciler) setupResource(ctx context.Context, hostname string, obj 
 	}
 
 	setExternalDnsAnnotation(mcDns.JoinARecordName(hostname, obj.GetName()), obj)
+
 	if err := r.Update(ctx, obj); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-type GameServerReconciler struct {
-	DnsReconciler
-}
-
-func (r *GameServerReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	gs := agonesv1.GameServer{}
-	return r.ReconcileDns(ctx, req, &gs)
-}
-
-func NewGameServerReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, dns provider.DnsClient) *GameServerReconciler {
-	return &GameServerReconciler{DnsReconciler: DnsReconciler{client, scheme, log, dns}}
-}
-
-type NodeReconciler struct {
-	DnsReconciler
-}
-
-func NewNodeReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger, dns provider.DnsClient) *NodeReconciler {
-	return &NodeReconciler{DnsReconciler: DnsReconciler{client, scheme, log, dns}}
-}
-
-func (r *NodeReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	node := corev1.Node{}
-	return r.ReconcileDns(ctx, req, &node)
 }

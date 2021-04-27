@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"net/http"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
@@ -25,21 +24,4 @@ type DnsClient interface {
 	RemoveNodeExternalDns(hostname string, node *corev1.Node) error
 	IgnoreClientError(err error) error
 	IgnoreAlreadyExists(err error) error
-}
-
-type DNSRecordExists struct {
-	Record string
-}
-
-func (e *DNSRecordExists) Error() string {
-	return fmt.Sprintf("record for %s already exists", e.Record)
-}
-
-type DNSRecordNonExistent struct {
-	Records     []string
-	ServerError error
-}
-
-func (e *DNSRecordNonExistent) Error() string {
-	return fmt.Sprintf("records for %v non existent", e.Records)
 }

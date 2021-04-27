@@ -38,11 +38,7 @@ func (c *GoogleDnsClient) SetGameServerExternalDns(hostname string, gs *agonesv1
 	change.Additions = []*dns.ResourceRecordSet{srvRecord}
 	_, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (c *GoogleDnsClient) RemoveGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
@@ -54,11 +50,7 @@ func (c *GoogleDnsClient) RemoveGameServerExternalDns(hostname string, gs *agone
 	change.Deletions = []*dns.ResourceRecordSet{srvRecord}
 	_, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (c *GoogleDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node) error {
@@ -73,11 +65,9 @@ func (c *GoogleDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node)
 
 	change.Additions = []*dns.ResourceRecordSet{aRecord}
 
-	if _, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do(); err != nil {
-		return err
-	}
+	_, err = c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
-	return nil
+	return err
 }
 
 func (c *GoogleDnsClient) RemoveNodeExternalDns(hostname string, node *corev1.Node) error {
@@ -92,11 +82,9 @@ func (c *GoogleDnsClient) RemoveNodeExternalDns(hostname string, node *corev1.No
 
 	change.Deletions = []*dns.ResourceRecordSet{aRecord}
 
-	if _, err := c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do(); err != nil {
-		return err
-	}
+	_, err = c.Changes.Create(c.config.GoogleProjectId, c.config.GoogleManagedZone, &change).Do()
 
-	return nil
+	return err
 }
 
 func NewSrvRecordSet(hostname string, gs *agonesv1.GameServer, ttl int64, aRecordName string) *dns.ResourceRecordSet {
