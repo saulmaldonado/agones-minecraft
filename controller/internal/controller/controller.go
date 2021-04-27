@@ -28,13 +28,13 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	exists := findExternalDnsAnnotation(obj)
-	hostname, hostnameFound := getHostnameAnnotation(obj)
+	dnsExists := findExternalDnsAnnotation(obj)
+	domain, domainFound := getDomainAnnotationOrLabel(obj)
 
-	if exists {
+	if dnsExists {
 		if schm.IsResourceDeleted(obj) {
 
-			if err := r.cleanUpResource(hostname, obj); err != nil {
+			if err := r.cleanUpResource(domain, obj); err != nil {
 				r.log.Error(err, "Error cleaning up resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 			} else {
 				r.log.Info("DNS record removed", "Resource", schm.GVKString(obj), "Name", obj.GetName())
@@ -44,12 +44,12 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 		return reconcile.Result{}, nil
 	}
 
-	if hostnameFound {
+	if domainFound {
 		if err := r.getResource(ctx, req.NamespacedName, obj); err != nil {
 			return reconcile.Result{}, client.IgnoreNotFound(err)
 		}
 
-		if err := r.setupResource(ctx, hostname, obj); err != nil {
+		if err := r.setupResource(ctx, domain, obj); err != nil {
 			r.log.Error(err, "Error setting Resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 			return reconcile.Result{}, r.dns.IgnoreClientError(err)
 		}
@@ -58,7 +58,7 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 		return reconcile.Result{}, nil
 	}
 
-	r.log.Info("No hostname annotation", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+	r.log.Info("No domain annotation or label", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 	return reconcile.Result{}, nil
 }
 

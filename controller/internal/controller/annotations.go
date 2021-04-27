@@ -4,20 +4,30 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/saulmaldonado/agones-minecraft/controller/internal/dns"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
+const (
 	AnnotationPrefix      string = "agones-mc"
-	HostnameAnnotation    string = "hostname"
+	DomainAnnotation      string = "domain"
 	ExternalDnsAnnotation string = "externalDNS"
 )
 
-func getHostnameAnnotation(obj client.Object) (string, bool) {
-	return getAnnotation(HostnameAnnotation, obj)
+func getDomainAnnotationOrLabel(obj client.Object) (string, bool) {
+	if domain, found := getAnnotation(DomainAnnotation, obj); found {
+		return dns.EnsureTrailingDot(domain), found
+	}
+
+	if domain, found := getLabel(DomainAnnotation, obj); found {
+		return dns.EnsureTrailingDot(domain), found
+	}
+
+	return "", false
 }
 
 func setExternalDnsAnnotation(recordName string, obj client.Object) string {
+	recordName = dns.EnsureTrailingDot(recordName)
 	setAnnotation(ExternalDnsAnnotation, recordName, obj)
 	return recordName
 }
@@ -31,13 +41,26 @@ func getAnnotation(suffix string, obj client.Object) (string, bool) {
 	key := fmt.Sprintf("%s/%s", AnnotationPrefix, suffix)
 	annotations := obj.GetAnnotations()
 
-	hostname, ok := annotations[key]
+	domain, ok := annotations[key]
 
-	if !ok || strings.TrimSpace(hostname) == "" {
+	if !ok || strings.TrimSpace(domain) == "" {
 		return "", false
 	}
 
-	return hostname, true
+	return domain, true
+}
+
+func getLabel(suffix string, obj client.Object) (string, bool) {
+	key := fmt.Sprintf("%s/%s", AnnotationPrefix, suffix)
+	labels := obj.GetLabels()
+
+	domain, ok := labels[key]
+
+	if !ok || strings.TrimSpace(domain) == "" {
+		return "", false
+	}
+
+	return domain, true
 }
 
 func setAnnotation(suffix string, value string, obj client.Object) {
