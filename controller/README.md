@@ -13,7 +13,7 @@
     <a href="https://github.com/saulmaldonado/agones-minecraft/tree/main/controller"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/saulmaldonado/agones-minecraft/tree/main/k8s/agones-mc-dns-controller">View Example</a>
+    <a href="#usage">View Example</a>
     ·
     <a href="https://github.com/saulmaldonado/agones-minecraft/issues">Report Bug</a>
     ·
@@ -51,22 +51,16 @@
 
 ## About The Project
 
-Custom Kubernetes controller for automating provisioning external DNS records for Minecraft GameServers using third-party cloud providers
+Custom Kubernetes controller for automating external DNS records for Agones Minecraft GameServers using third-party DNS providers
 
 ### Built With
 
-- [controller-runtime](https://github.com/Raqbit/mc-pinger)
+- [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime)
 - [Agones](agones.dev/agones)
 
 <!-- GETTING STARTED -->
 
 ## Getting Started
-
-To get the controller running:
-
-```sh
-docker run -it --rm saulmaldonado/agones-mc-dns-controller --gcp-project=<PROJECT_ID> --zone=<DNS_MANAGED_ZONE>
-```
 
 ### Prerequisites
 
@@ -77,7 +71,8 @@ You need a running GKE cluster running with Agones resources and controllers ins
 ```sh
 gcloud container clusters create minecraft --cluster-version=1.18 \
   --tags=mc \
-  --scopes=gke-default,"https://www.googleapis.com/auth/ndev.clouddns.readwrite" \
+  --scopes=gke-default,"https://www.googleapis.com/auth/ndev.clouddns.readwrite" \ # GKE scope needed for Cloud DNS
+  --node-labels=agones-mc/<DOMAIN_NAME> # Replace with the domain for the zone that the controller will manage
   --num-nodes=2 \
   --no-enable-autoupgrade \
   --machine-type=n2-standard-4
@@ -161,10 +156,16 @@ spec:
           imagePullPolicy: Always
 ```
 
-#### Download from Docker Hub
+#### Or run locally out of cluster
 
 ```sh
-docker pull saulmaldonado/agones-mc-dns-controller
+ docker run -it --rm --name agones-mc-dns-controller \
+ -v $HOME/.kube/config:/root/.kube/config \ # Passes kubeconfig to container
+ -v $HOME/.config/gcloud/:/root/.config/gcloud/ \ # Passes gcloud credentials to container
+ -e HOME=/root \ # Needed for google oauth authentication
+ saulmaldonado/agones-mc-dns-controller \
+ --gcp-project=$(GCP_PROJECT) \ # Replace with GCP project ID
+ --zone=$(MANAGED_ZONE) # Replace with Managed DNS zone
 ```
 
 <!-- USAGE EXAMPLES -->
@@ -175,27 +176,27 @@ This controller takes advantage of dynamic host port allocation that Agones prov
 
 ### Nodes
 
-To provision an `A` record for Nodes, they need to have `agones-mc/hostname` annotation that contains the domain of the `zone` that the controller is managing. This will indicate to the controller that the Node needs an `A` record.
+To provision an `A` record for Nodes, they need to have `agones-mc/domain` label that contains the domain of the `zone` that the controller is managing. This will indicate to the controller that the Node needs an `A` record.
 
-Annotating Nodes can be done using `kubectl`:
+Labeling existing Nodes can be done using `kubectl`:
 
 ```sh
-kubectl annotate node/<NODE_NAME> agones-mc/hostname=<DOMAIN>
+kubectl label node/<NODE_NAME> agones-mc/domain=<DOMAIN>
 ```
 
-All Node that you intend to host GameServers one should have this annotation.
+_All Nodes that you intend to host GameServers one should have this label._
 
-New annotation with `agones-mc/externalDNS` will contain the new `A` record that points to the Node IP.
+A new annotation with `agones-mc/externalDNS` will contain the new `A` record that points to the Node IP.
 
 Example:
 
-| Node Name                                  | hostname annotation | Resulting `A` Record                                   |
-| ------------------------------------------ | ------------------- | ------------------------------------------------------ |
-| `gke-minecraft-default-pool-79cd0803-42d7` | `example.com`       | `gke-minecraft-default-pool-79cd0803-42d7.example.com` |
+| Node Name                                  | domain label  | Resulting `A` Record                                   |
+| ------------------------------------------ | ------------- | ------------------------------------------------------ |
+| `gke-minecraft-default-pool-79cd0803-42d7` | `example.com` | `gke-minecraft-default-pool-79cd0803-42d7.example.com` |
 
 ### GameServer
 
-To provision an `SRV` record for GameServers, they need to contain an `agones-mc/hostname` annotation that contains the domain for the current Managed Zone. This will indicate to the controller that the GameServer needs a `SRV` record.
+To provision an `SRV` record for GameServers, they need to contain an `agones-mc/domain` annotation that contains the domain for the controller's Managed Zone. This will indicate to the controller that the GameServer needs a `SRV` record.
 
 #### GameServer Pod template example
 
@@ -203,7 +204,7 @@ To provision an `SRV` record for GameServers, they need to contain an `agones-mc
 template:
   metadata:
     annotations:
-      agones-mc/hostname: <DOMAIN_NAME> # Domain name of the managed zone
+      agones-mc/domain: <DOMAIN_NAME> # Domain name of the managed zone
       # agones-mc/externalDNS: <GAMESERVER_NAME>.<DOMAIN_NAME> # Will be added by the controller
   spec:
     containers:
@@ -223,9 +224,9 @@ Once the pod has been created, a new `SRV` will be generated with the format `_m
 
 A new annotation `agones-mc/externalDNS` will then be added to the GameServer containing the URL from which players can connect to.
 
-| GameServer Name   | Port | annotation                        | Node `A` Record                                         | Resulting `SRV` Record                                                                                       | Minecraft Server URL        |
-| ----------------- | ---- | --------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------- |
-| `mc-server-cfwd7` | 7908 | `agones-mc/hostname: example.com` | `gke-minecraft-default-pool-79cd0803-42d7.example.com.` | `_minecraft._tcp.mc-server-cfwd7.example.com 0 0 7908 gke-minecraft-default-pool-79cd0803-42d7.example.com.` | mc-server-cfwd7.example.com |
+| GameServer Name   | Port | domain annotation               | Node `A` Record                                         | Resulting `SRV` Record                                                                                       | Minecraft Server URL        |
+| ----------------- | ---- | ------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| `mc-server-cfwd7` | 7908 | `agones-mc/domain: example.com` | `gke-minecraft-default-pool-79cd0803-42d7.example.com.` | `_minecraft._tcp.mc-server-cfwd7.example.com 0 0 7908 gke-minecraft-default-pool-79cd0803-42d7.example.com.` | mc-server-cfwd7.example.com |
 
 #### [Full GameServer specification example](../k8s/mc-server.yml)
 
@@ -234,7 +235,13 @@ A new annotation `agones-mc/externalDNS` will then be added to the GameServer co
 ### Run Locally with Docker
 
 ```sh
-docker run -it --rm saulmaldonado/agones-mc-dns-controller --gcp-project=<PROJECT_ID> --zone=<DNS_MANAGED_ZONE> --kubeconfig=<KUBE_CONFIG_PATH>
+ docker run -it --rm --name agones-mc-dns-controller \
+ -v $HOME/.kube/config:/root/.kube/config \ # Passes kubeconfig to container
+ -v $HOME/.config/gcloud/:/root/.config/gcloud/ \ # Passes gcloud credentials to container
+ -e HOME=/root \ # Needed for google oauth authentication
+ saulmaldonado/agones-mc-dns-controller \
+ --gcp-project=$(GCP_PROJECT) \ # Replace with GCP project ID
+ --zone=$(MANAGED_ZONE) # Replace with Managed DNS zone
 ```
 
 Flags:

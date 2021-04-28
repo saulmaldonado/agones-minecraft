@@ -23,7 +23,7 @@ spec:
     # GameServer metadata
     metadata:
       annotations:
-        agones-mc/hostname: <DOMAIN_NAME>
+        agones-mc/domain: <DOMAIN_NAME>
     spec:
       container: mc-server # Minecraft server container name
       ports:
