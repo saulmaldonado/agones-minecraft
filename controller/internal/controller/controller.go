@@ -58,7 +58,7 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 		return reconcile.Result{}, nil
 	}
 
-	r.log.Info("No domain annotation or label", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+	r.log.Info("No domain annotation/label or is invalid domain name", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 	return reconcile.Result{}, nil
 }
 

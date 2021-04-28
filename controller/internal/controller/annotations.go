@@ -15,7 +15,7 @@ const (
 )
 
 func getDomainAnnotationOrLabel(obj client.Object) (string, bool) {
-	if domain, found := getAnnotation(DomainAnnotation, obj); found {
+	if domain, found := getAnnotation(DomainAnnotation, obj); found && dns.IsDnsName(domain) {
 		return dns.EnsureTrailingDot(domain), found
 	}
 
