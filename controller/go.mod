@@ -6,6 +6,8 @@ require (
 	agones.dev/agones v1.13.0
 	cloud.google.com/go v0.81.0
 	github.com/go-logr/logr v0.3.0
+	github.com/onsi/ginkgo v1.16.1
+	github.com/onsi/gomega v1.11.0
 	github.com/smartystreets/assertions v1.0.1 // indirect
 	golang.org/x/oauth2 v0.0.0-20210413134643-5e61552d6c78
 	google.golang.org/api v0.45.0
