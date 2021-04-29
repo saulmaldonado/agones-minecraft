@@ -32,13 +32,18 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 	domain, domainFound := getDomainAnnotationOrLabel(obj)
 
 	if dnsExists {
-		if schm.IsResourceDeleted(obj) {
+		if schm.IsResourceDeleted(obj) && findFinalizer(obj) {
 
 			if err := r.cleanUpResource(domain, obj); err != nil {
 				r.Log.Error(err, "Error cleaning up resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 			} else {
 				r.Log.Info("DNS record removed", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 			}
+
+			if err := r.deleteResource(ctx, obj); err != nil {
+				return reconcile.Result{}, err
+			}
+
 		}
 
 		return reconcile.Result{}, nil
@@ -98,10 +103,16 @@ func (r *DnsReconciler) setupResource(ctx context.Context, hostname string, obj 
 	}
 
 	setExternalDnsAnnotation(mcDns.JoinARecordName(hostname, obj.GetName()), obj)
+	setFinalizer(obj)
 
 	if err := r.Update(ctx, obj); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (r *DnsReconciler) deleteResource(ctx context.Context, obj client.Object) error {
+	removeFinalizer(obj)
+	return r.Update(ctx, obj)
 }
