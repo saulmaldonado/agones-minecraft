@@ -48,9 +48,8 @@ var _ = Describe("GameServer Controller", func() {
 					Annotations: map[string]string{
 						"agones-mc/domain": "saulmaldonado.me",
 					},
-					Name:       GameServerName,
-					Namespace:  metav1.NamespaceDefault,
-					Finalizers: []string{"agones.dev"},
+					Name:      GameServerName,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: agonesv1.GameServerSpec{
 					Container: GameServerContainer,
@@ -112,13 +111,21 @@ var _ = Describe("GameServer Controller", func() {
 					Annotations: map[string]string{
 						"agones-mc/domain": "saulmaldonado.me",
 					},
-					Name:       GameServerName,
-					Namespace:  metav1.NamespaceDefault,
-					Finalizers: []string{"agones.dev"},
+					Name:      GameServerName,
+					Namespace: metav1.NamespaceDefault,
 				},
 			}
 
 			Expect(testClient.Delete(ctx, &gs)).Should(Succeed())
+
+			By("Checking if GameServer is deleted")
+
+			gameServerKey := types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: GameServerName}
+			createdGameServer := agonesv1.GameServer{}
+
+			Eventually(func() error {
+				return testClient.Get(ctx, gameServerKey, &createdGameServer)
+			}, Timeout, Interval).ShouldNot(Succeed())
 
 			By("Checking mock DNS store for DNS records")
 			Eventually(func() bool {
