@@ -18,9 +18,9 @@ import (
 
 type DnsReconciler struct {
 	client.Client
-	scheme *runtime.Scheme
-	log    logr.Logger
-	dns    provider.DnsClient
+	Scheme *runtime.Scheme
+	Log    logr.Logger
+	Dns    provider.DnsClient
 }
 
 func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request, obj client.Object) (reconcile.Result, error) {
@@ -35,9 +35,9 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 		if schm.IsResourceDeleted(obj) {
 
 			if err := r.cleanUpResource(domain, obj); err != nil {
-				r.log.Error(err, "Error cleaning up resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+				r.Log.Error(err, "Error cleaning up resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 			} else {
-				r.log.Info("DNS record removed", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+				r.Log.Info("DNS record removed", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 			}
 		}
 
@@ -50,15 +50,15 @@ func (r *DnsReconciler) ReconcileDns(ctx context.Context, req reconcile.Request,
 		}
 
 		if err := r.setupResource(ctx, domain, obj); err != nil {
-			r.log.Error(err, "Error setting Resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
-			return reconcile.Result{}, r.dns.IgnoreClientError(err)
+			r.Log.Error(err, "Error setting Resource DNS", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+			return reconcile.Result{}, r.Dns.IgnoreClientError(err)
 		}
 
-		r.log.Info("New DNS record set", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+		r.Log.Info("New DNS record set", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 		return reconcile.Result{}, nil
 	}
 
-	r.log.Info("No domain annotation/label or is invalid domain name", "Resource", schm.GVKString(obj), "Name", obj.GetName())
+	r.Log.Info("No domain annotation/label or is invalid domain name", "Resource", schm.GVKString(obj), "Name", obj.GetName())
 	return reconcile.Result{}, nil
 }
 
@@ -66,7 +66,7 @@ func (r *DnsReconciler) getResource(ctx context.Context, namespacedName types.Na
 	err := r.Get(ctx, namespacedName, obj)
 
 	if err != nil && errors.IsNotFound(err) {
-		r.log.Info("Could not find resource", "Name", namespacedName.String())
+		r.Log.Info("Could not find resource", "Name", namespacedName.String())
 	}
 
 	return err
@@ -75,9 +75,9 @@ func (r *DnsReconciler) getResource(ctx context.Context, namespacedName types.Na
 func (r *DnsReconciler) cleanUpResource(hostname string, obj client.Object) error {
 	switch res := obj.(type) {
 	case *agonesv1.GameServer:
-		return r.dns.RemoveGameServerExternalDns(hostname, res)
+		return r.Dns.RemoveGameServerExternalDns(hostname, res)
 	case *corev1.Node:
-		return r.dns.RemoveNodeExternalDns(hostname, res)
+		return r.Dns.RemoveNodeExternalDns(hostname, res)
 	}
 
 	return nil
@@ -88,9 +88,9 @@ func (r *DnsReconciler) setupResource(ctx context.Context, hostname string, obj 
 
 	switch res := obj.(type) {
 	case *agonesv1.GameServer:
-		err = r.dns.SetGameServerExternalDns(hostname, res)
+		err = r.Dns.SetGameServerExternalDns(hostname, res)
 	case *corev1.Node:
-		err = r.dns.SetNodeExternalDns(hostname, res)
+		err = r.Dns.SetNodeExternalDns(hostname, res)
 	}
 
 	if err != nil {
