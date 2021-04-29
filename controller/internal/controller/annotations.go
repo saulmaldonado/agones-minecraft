@@ -64,8 +64,13 @@ func getLabel(suffix string, obj client.Object) (string, bool) {
 }
 
 func setAnnotation(suffix string, value string, obj client.Object) {
-
 	key := fmt.Sprintf("%s/%s", AnnotationPrefix, ExternalDnsAnnotation)
 	annotations := obj.GetAnnotations()
+
+	if annotations == nil {
+		annotations = map[string]string{}
+		obj.SetAnnotations(annotations)
+	}
+
 	annotations[key] = value
 }
