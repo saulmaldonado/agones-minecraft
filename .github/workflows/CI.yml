@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'controller/**'
+
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16.3
+
+    - name: Set up testing env.
+      run: |
+        os=$(go env GOOS)
+        arch=$(go env GOARCH)
+
+        curl -L https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} | tar -xz -C /tmp/
+
+        mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
+
+    - name: Test
+      working-directory: ./controller
+      run: go test -v ./...
+
+    - name: Build
+      working-directory: ./controller
+      run: go build main.go
+
+    - name: Build Docker
+      working-directory: ./controller
+      run: docker build .
