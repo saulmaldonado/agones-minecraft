@@ -79,6 +79,20 @@ var _ = BeforeSuite(func() {
 
 	Expect(err).NotTo(HaveOccurred())
 
+	err = ctrl.NewControllerManagedBy(manager).For(&corev1.Node{}).
+		Complete(
+			&controller.NodeReconciler{
+				DnsReconciler: controller.DnsReconciler{
+					Client: manager.GetClient(),
+					Scheme: manager.GetScheme(),
+					Log:    ctrl.Log.WithName("controllers").WithName("Nodes"),
+					Dns:    FakeDns,
+				},
+			},
+		)
+
+	Expect(err).NotTo(HaveOccurred())
+
 	go func() {
 		manager.Start(ctrl.SetupSignalHandler())
 		Expect(err).NotTo(HaveOccurred())
@@ -122,10 +136,22 @@ func (d *TestDnsClient) RemoveGameServerExternalDns(hostname string, gs *agonesv
 }
 
 func (d *TestDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node) error {
+	aRecord := dns.JoinARecordName(hostname, node.Name)
+
+	d.DnsRecords = append(d.DnsRecords, aRecord)
+
 	return nil
 }
 
-func (*TestDnsClient) RemoveNodeExternalDns(hostname string, node *corev1.Node) error {
+func (d *TestDnsClient) RemoveNodeExternalDns(hostname string, node *corev1.Node) error {
+	aRecord := dns.JoinARecordName(hostname, node.Name)
+
+	for i, record := range d.DnsRecords {
+		if aRecord == record {
+			d.DnsRecords = append(d.DnsRecords[:i], d.DnsRecords[i+1:]...)
+		}
+	}
+
 	return nil
 }
 
