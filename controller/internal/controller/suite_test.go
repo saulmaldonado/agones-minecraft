@@ -1,4 +1,4 @@
-package controller
+package controller_test
 
 import (
 	"path/filepath"
@@ -7,7 +7,9 @@ import (
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/saulmaldonado/agones-minecraft/controller/internal/controller"
 	schm "github.com/saulmaldonado/agones-minecraft/controller/internal/controller/scheme"
+	"github.com/saulmaldonado/agones-minecraft/controller/internal/dns"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,8 +21,11 @@ import (
 )
 
 var (
-	testClient client.Client
-	testEnv    *envtest.Environment
+	testClient      client.Client
+	testEnv         *envtest.Environment
+	FakeDns         *TestDnsClient
+	DefaultPriority = 0
+	DefaultWeight   = 0
 )
 
 func TestAPIs(t *testing.T) {
@@ -55,17 +60,19 @@ var _ = BeforeSuite(func() {
 
 	Expect(err).NotTo(HaveOccurred())
 
+	FakeDns = &TestDnsClient{DnsRecords: []string{}}
+
 	err = ctrl.NewControllerManagedBy(manager).For(&agonesv1.GameServer{}).WithEventFilter(
 		predicate.NewPredicateFuncs(func(object client.Object) bool {
 			gs := object.(*agonesv1.GameServer)
 			return !schm.IsBeforePodCreated(gs)
 		})).Complete(
-		&GameServerReconciler{
-			DnsReconciler: DnsReconciler{
-				scheme: manager.GetScheme(),
-				log:    ctrl.Log.WithName("controllers").WithName("GameServer"),
+		&controller.GameServerReconciler{
+			DnsReconciler: controller.DnsReconciler{
 				Client: manager.GetClient(),
-				dns:    &TestDnsClient{},
+				Scheme: manager.GetScheme(),
+				Log:    ctrl.Log.WithName("controllers").WithName("GameServer"),
+				Dns:    FakeDns,
 			},
 		},
 	)
@@ -78,17 +85,43 @@ var _ = BeforeSuite(func() {
 	}()
 }, 60)
 
-type TestDnsClient struct{}
+type TestDnsClient struct {
+	DnsRecords []string
+}
 
-func (*TestDnsClient) SetGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
+func (d *TestDnsClient) SetGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
+	nodeARecord := dns.JoinARecordName(hostname, gs.Status.NodeName)
+	srvRecord := dns.JoinSrvRecordName(hostname, gs.Name)
+
+	port := gs.Status.Ports[0].Port
+
+	resourceRecord := dns.JoinSrvRR(srvRecord, uint16(port), DefaultPriority, DefaultWeight, nodeARecord)
+
+	d.DnsRecords = append(d.DnsRecords, srvRecord+" "+resourceRecord)
+
 	return nil
 }
 
-func (*TestDnsClient) RemoveGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
+func (d *TestDnsClient) RemoveGameServerExternalDns(hostname string, gs *agonesv1.GameServer) error {
+	nodeARecord := dns.JoinARecordName(hostname, gs.Status.NodeName)
+	srvRecord := dns.JoinSrvRecordName(hostname, gs.Name)
+
+	port := gs.Status.Ports[0].Port
+
+	resourceRecord := dns.JoinSrvRR(srvRecord, uint16(port), DefaultPriority, DefaultWeight, nodeARecord)
+
+	recordToDelete := srvRecord + " " + resourceRecord
+
+	for i, record := range d.DnsRecords {
+		if record == recordToDelete {
+			d.DnsRecords = append(d.DnsRecords[:i], d.DnsRecords[i+1:]...)
+		}
+	}
+
 	return nil
 }
 
-func (*TestDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node) error {
+func (d *TestDnsClient) SetNodeExternalDns(hostname string, node *corev1.Node) error {
 	return nil
 }
 
