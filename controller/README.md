@@ -72,7 +72,7 @@ You need a running GKE cluster running with Agones resources and controllers ins
 gcloud container clusters create minecraft --cluster-version=1.18 \
   --tags=mc \
   --scopes=gke-default,"https://www.googleapis.com/auth/ndev.clouddns.readwrite" \ # GKE scope needed for Cloud DNS
-  --node-labels=agones-mc/<DOMAIN_NAME> # Replace with the domain for the zone that the controller will manage
+  --node-labels=agones-mc/<DOMAIN_NAME> \ # Replace with the domain for the zone that the controller will manage
   --num-nodes=2 \
   --no-enable-autoupgrade \
   --machine-type=n2-standard-4
@@ -99,7 +99,7 @@ kubectl apply -f https://raw.githubusercontent.com/googleforgames/agones/release
 
 ### Installation
 
-`kubectl apply -f https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml`
+`kubectl apply`
 
 ```yml
 apiVersion: v1

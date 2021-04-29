@@ -9,7 +9,7 @@
 
 ```sh
 gcloud dns managed-zones create agones-minecraft \ # Any name
-    --description="agones-mc-dns-controller managed DNS zone"\
+    --description="agones-mc-dns-controller managed DNS zone" \
     --dns-name=<DOMAIN> \ # Domain that you own
     --visibility=public
 ```
@@ -26,7 +26,7 @@ gcloud dns managed-zones describe agones-minecraft
 gcloud container clusters create minecraft --cluster-version=1.18 \
   --tags=mc \
   --scopes=gke-default,"https://www.googleapis.com/auth/ndev.clouddns.readwrite" \ # GKE scope needed for Cloud DNS
-  --node-labels=agones-mc/<DOMAIN_NAME> # Replace with the domain for the zone that the controller will manage
+  --node-labels=agones-mc/domain=<DOMAIN_NAME> \ # Replace with the domain for the zone that the controller will manage
   --num-nodes=2 \
   --no-enable-autoupgrade \
   --machine-type=n2-standard-4
@@ -62,7 +62,7 @@ kubectl describe --namespace agones-system pods
 ### [Controller Documentation](./controller)
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml
+ sed 's/<MANAGED_ZONE>/agones-minecraft/' https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml | kubectl apply -f - # agones-minecraft matches the name of zone created earlier
 ```
 
 ## 6. Deploy Minecraft GameServer Fleet
