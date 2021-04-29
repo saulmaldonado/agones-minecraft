@@ -1,16 +1,16 @@
-name: Publish Controller
+name: CD
 
 on:
   push:
     branches:
       - main
-    paths: 
+    paths:
       - 'controller/**'
     tags:
       - v*.*.*
 
 jobs:
-  build-and-publish:
+  test-build-and-publish:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -19,11 +19,24 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16.3
-        
+
+    - name: Set up testing env.
+      run: |
+        os=$(go env GOOS)
+        arch=$(go env GOARCH)
+
+        curl -L https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} | tar -xz -C /tmp/
+
+        mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
+
+    - name: Test
+      working-directory: ./controller
+      run: go test -v ./...
+
     - name: Docker meta
       id: meta
       uses: crazy-max/ghaction-docker-meta@v2
-      with: 
+      with:
         images: saulmaldonado/agones-mc-dns-controller
         flavor: |
           latest=true
@@ -36,7 +49,7 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    
+
     - name: Build and push
       uses: docker/build-push-action@v2
       with:
