@@ -1,29 +1,26 @@
 apiVersion: "agones.dev/v1"
 kind: Fleet
 metadata:
-  name: mc-fleet
+  name: mc
 spec:
   # the number of GameServers to keep Ready or Allocated in this Fleet
-  replicas: 3
+  replicas: 5
   # defines how GameServers are organised across the cluster.
   # "Packed" (default) is aimed at dynamic Kubernetes clusters, such as cloud providers, wherein we want to bin pack
   # resources
   scheduling: Packed
   strategy:
-    # "RollingUpdate" will increment by maxSurge value on each iteration, while decrementing by maxUnavailable on each
-    # iteration, until all GameServers have been switched from one version to another.
     # "Recreate" terminates all non-allocated GameServers, and starts up a new set with the new details to replace them.
-    type: RollingUpdate
-    rollingUpdate:
-      # the amount to increment the new GameServers by. Defaults to 25%
-      maxSurge: 25%
-      # the amount to decrements GameServers by. Defaults to 25%
-      maxUnavailable: 25%
+    type: Recreate
   template:
     # GameServer metadata
+    # GameServer lablel to match with GameServerAllocation
     metadata:
+      labels:
+        game: mc
       annotations:
-        agones-mc/domain: <DOMAIN_NAME>
+        # Game server externalDNS domain name
+        agones-mc/domain: <DOMAIN> # Replace with domain of managed zone
     spec:
       container: mc-server # Minecraft server container name
       ports:
@@ -32,7 +29,7 @@ spec:
         containerPort: 25565
         protocol: TCP
       health:
-        initialDelaySeconds: 60
+        initialDelaySeconds: 300 # Server must be ready within 5m + 60s or it gets recreated
         periodSeconds: 12
         failureThreshold: 5
       # The GameServer's Pod template
@@ -44,7 +41,13 @@ spec:
               env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-server
                 - name: EULA
                   value: "TRUE"
-
+                - name: MEMORY
+                  value: "2G"
+              resources:
+              # Resource requests for a server of 20 max players
+                requests:
+                  memory: "2.5Gi"
+                  cpu: "1"
             - name: mc-monitor
-              image: saulmaldonado/agones-mc-monitor # Agones SDK sidecar
+              image: saulmaldonado/agones-mc-monitor # Agones SDK monitor sidecar
               imagePullPolicy: Always
