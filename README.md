@@ -1,11 +1,15 @@
-# Installation
+# Agones Minecraft
 
-## Prerequisites
+Minecraft dedicated game server cluster hosting solution using GKE and Agones
+
+## Installation
+
+### Prerequisites
 
 - [gcloud](https://cloud.google.com/sdk/docs/install)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/included/install-kubectl-gcloud/)
 
-## 1. Create public DNS Zone
+### 1. Create public DNS Zone
 
 ```sh
 gcloud dns managed-zones create agones-minecraft \ # Any name
@@ -20,7 +24,7 @@ Point domain to Google nameservers
 gcloud dns managed-zones describe agones-minecraft
 ```
 
-## 2. Create Kubernetes Cluster
+### 2. Create Kubernetes Cluster
 
 ```sh
 gcloud container clusters create minecraft --cluster-version=1.18 \
@@ -44,40 +48,70 @@ gcloud compute firewall-rules create mc-server-firewall \
   --description "Firewall rule to allow mc server tcp traffic"
 ```
 
-## 3. Install Agones
+### 3. Install Agones
 
 ```sh
 kubectl create namespace agones-system
 kubectl apply -f https://raw.githubusercontent.com/googleforgames/agones/release-1.14.0/install/yaml/install.yaml
 ```
 
-## 4. Verify Agones
+or
+
+```sh
+helm repo add agones https://agones.dev/chart/stable
+helm repo update
+helm install agones --namespace agones-system --create-namespace agones/agones
+```
+
+### 4. Verify Agones
 
 ```sh
 kubectl get pods -n agones-system
 ```
 
-## 5. Install Custom Minecraft DNS Controller
+### 5. Install Custom Minecraft DNS Controller
 
-### [Controller Documentation](./controller)
+#### [Controller Documentation](./controller)
 
 ```sh
- sed 's/<MANAGED_ZONE>/agones-minecraft/' https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml | kubectl apply -f - # agones-minecraft matches the name of zone created earlier
+ sed 's/<MANAGED_ZONE>/agones-minecraft/' <(curl https://raw.githubusercontent.com/saulmaldonado/agones-minecraft/main/k8s/agones-mc-dns-controller.yaml) | kubectl apply -f - # agones-minecraft matches the name of zone created earlier
 ```
 
-## 6. Deploy Minecraft GameServer Fleet
+## Deploy Java Servers
+
+### 1. Deploy Minecraft GameServer Fleet
 
 ```sh
 sed 's/<DOMAIN>/example.com/' k8s/mc-server-fleet.yml | kubectl apply -f - # replace 'example.com' with the domain you will be using
 ```
 
-## 7. Allocate Server
+### 2. Allocate Ready Servers
 
 ```sh
 kubectl create -f k8s/allocation.yml
 ```
 
-## 7. List Minecraft GameServer Addresses
+### 3. List Allocated Minecraft GameServer Addresses
+
+```sh
+kubectl get gs -o jsonpath='{.items[?(@.status.state=="Allocated")].metadata.annotations.agones-mc/externalDNS}'
+```
+
+## Deploy Bedrock Servers
+
+### 1. Deploy Bedrock GameServer Fleet
+
+```sh
+sed 's/<DOMAIN>/example.com/' k8s/mc-bedrock-fleet.yml | kubectl apply -f - # replace 'example.com' with the domain you will be using
+```
+
+### 2. Allocate Ready Bedrock Servers
+
+```sh
+kubectl create -f k8s/bedrock-allocation.yml
+```
+
+### 3. List Allocated Bedrock GameServer Addresses
 
 ```sh
 kubectl get gs -o jsonpath='{.items[?(@.status.state=="Allocated")].metadata.annotations.agones-mc/externalDNS}'
