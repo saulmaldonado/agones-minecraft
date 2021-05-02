@@ -48,13 +48,13 @@ gcloud compute firewall-rules create mc-server-firewall \
 
 ```sh
 kubectl create namespace agones-system
-kubectl apply -f https://raw.githubusercontent.com/googleforgames/agones/release-1.13.0/install/yaml/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/googleforgames/agones/release-1.14.0/install/yaml/install.yaml
 ```
 
 ## 4. Verify Agones
 
 ```sh
-kubectl describe --namespace agones-system pods
+kubectl get pods -n agones-system
 ```
 
 ## 5. Install Custom Minecraft DNS Controller
@@ -68,11 +68,17 @@ kubectl describe --namespace agones-system pods
 ## 6. Deploy Minecraft GameServer Fleet
 
 ```sh
-sed 's/<DOMAIN_NAME>/example.com/' k8s/mc-server-fleet.yml | kubectl apply -f - # replace 'example.com' with the domain you will be using
+sed 's/<DOMAIN>/example.com/' k8s/mc-server-fleet.yml | kubectl apply -f - # replace 'example.com' with the domain you will be using
+```
+
+## 7. Allocate Server
+
+```sh
+kubectl create -f k8s/allocation.yml
 ```
 
 ## 7. List Minecraft GameServer Addresses
 
 ```sh
-kubectl get gs -o jsonpath='{.items[*].metadata.annotations.agones-mc/externalDNS}'
+kubectl get gs -o jsonpath='{.items[?(@.status.state=="Allocated")].metadata.annotations.agones-mc/externalDNS}'
 ```
