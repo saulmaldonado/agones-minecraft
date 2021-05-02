@@ -1,7 +1,7 @@
 apiVersion: "agones.dev/v1"
 kind: Fleet
 metadata:
-  name: mc
+  name: mc-bedrock
 spec:
   # the number of GameServers to keep Ready or Allocated in this Fleet
   replicas: 5
@@ -18,7 +18,7 @@ spec:
     metadata:
       labels:
         game: mc
-        edition: java
+        edition: bedrock
       annotations:
         # Game server externalDNS domain name
         agones-mc/domain: <DOMAIN> # Replace with domain of managed zone
@@ -27,8 +27,8 @@ spec:
       ports:
       - name: mc
         portPolicy: Dynamic
-        containerPort: 25565
-        protocol: TCP
+        containerPort: 19132
+        protocol: UDP
       health:
         initialDelaySeconds: 300 # Server must be ready within 5m + 60s or it gets recreated
         periodSeconds: 12
@@ -38,17 +38,21 @@ spec:
         spec:
           containers:
             - name: mc-server
-              image: itzg/minecraft-server # Minecraft server image
-              env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-server
+              image: itzg/minecraft-bedrock-server # Minecraft bedrock server image
+              env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-bedrock-server
                 - name: EULA
                   value: "TRUE"
-                - name: MEMORY
-                  value: "2G"
               resources:
               # Resource requests for a server of 20 max players
                 requests:
                   memory: "2.5Gi"
                   cpu: "1"
+
             - name: mc-monitor
-              image: saulmaldonado/agones-mc-monitor # Agones SDK monitor sidecar
-              imagePullPolicy: Always
+              image: saulmaldonado/agones-mc-monitor # Agones SDK sidecar
+              args:
+                - --attemps=5 # matches spec.health.failureThreshold
+                - --interval=10s # below spec.health.periodSecond
+                - --timeout=10s # matches interval
+                - --port=19132 # matches mc-server containerPort
+                - --edition=bedrock # bedrock edition

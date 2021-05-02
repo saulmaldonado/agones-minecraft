@@ -2,10 +2,10 @@ apiVersion: "allocation.agones.dev/v1"
 kind: GameServerAllocation
 spec:
   required:
-    # allocates 'Ready' GameServer with labels game: mc and edition: java
+    # allocates 'Ready' GameServer with labels game: mc and edition: bedrock
     matchLabels:
       game: mc
-      edition: java
+      edition: bedrock
   scheduling: Packed
 metadata:
-  generateName: 'mc-allocation-'
+  generateName: 'mc-bedrock-allocation-'
