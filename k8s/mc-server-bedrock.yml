@@ -3,8 +3,7 @@ kind: GameServer
 metadata:
   annotations:
     external-dns.alpha.kubernetes.io/hostname: <DOMAIN>
-    external-dns.alpha.kubernetes.io/gameserver-service: minecraft
-  generateName: 'mc-server-' # Generates a unique name for GameServer and Pod
+  generateName: 'mc-bedrock-' # Generates a unique name for GameServer and Pod
 spec:
   container: mc-server # Minecraft server container name
   ports:
@@ -14,13 +13,13 @@ spec:
       # The name of the container to open the port on. Defaults to the game server container if omitted or empty.
       container: mc-server
       # the port that is being opened on the game server process
-      containerPort: 25565
-      # Minecraft uses TCP to connect players
-      protocol: TCP
+      containerPort: 19132
+      # Bedrock uses UDP to connect players
+      protocol: UDP
   # Health checking for the running game server
   health:
     # Number of seconds after the container has started before health check is initiated.
-    initialDelaySeconds: 60
+    initialDelaySeconds: 300
     # If the `Health()` function doesn't get called at least once every period (seconds), then
     # the game server is not healthy.
     periodSeconds: 12
@@ -30,8 +29,9 @@ spec:
     spec:
       containers:
         - name: mc-server
-          image: itzg/minecraft-server # Minecraft Java server image
-          env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-server
+          image: itzg/minecraft-bedrock-server # Minecraft bedrock server image
+          imagePullPolicy: Always
+          env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-bedrock-server
             - name: EULA
               value: "TRUE"
           volumeMounts:
@@ -39,13 +39,15 @@ spec:
               name: world-vol
 
         - name: mc-monitor
-          image: saulmaldonado/agones-mc # monitor
+          image: saulmaldonado/agones-mc
           args:
             - monitor
             - --attempts=5 # matches spec.health.failureThreshold
             - --initial-delay=60s # matches spec.health.initialDelaySeconds
             - --interval=10s # below spec.health.periodSecond
             - --timeout=10s # matches interval
+            - --port=19132 # matches mc-server containerPort
+            - --edition=bedrock # bedrock edition
           imagePullPolicy: Always
 
         - name: mc-backup
@@ -53,21 +55,18 @@ spec:
           args:
             - backup
             - --gcp-bucket-name=agones-minecraft-mc-worlds # GCP Cloud storage bucket name for world archives
-            - --backup-cron=0 */6 * * * # crontab for recurring backups. omiting flag will only run backup once
+            - --backup-cron=*/5 * * * * # crontab for recurring backups. omiting flag will only run backup once
             - --initial-delay=60s # delay for mc-server to build world before scheduling backup jobs
+            - --edition=bedrock
           env:
             - name: NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name # GameServer ref for naming backup zip files
-            - name: RCON_PASSWORD
-              value: minecraft # default rcon password. If provided RCON connection will be used to execute 'save-all' before a backup job.
-              # Change the rcon password when exposing RCON port outside the pod
           imagePullPolicy: Always
           volumeMounts:
             - mountPath: /data # shared vol with mc-server
               name: world-vol
-
       volumes:
         - name: world-vol # shared vol between containers. will not persist bewteen restarts
           emptyDir: {}

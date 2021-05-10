@@ -20,39 +20,70 @@ spec:
         game: mc
         edition: bedrock
       annotations:
-        # Game server externalDNS domain name
-        agones-mc/domain: <DOMAIN> # Replace with domain of managed zone
+        external-dns.alpha.kubernetes.io/hostname: <DOMAIN> # Replace externalDNS managed zone
     spec:
       container: mc-server # Minecraft server container name
       ports:
-      - name: mc
-        portPolicy: Dynamic
-        containerPort: 19132
-        protocol: UDP
+        - name: mc
+          # "Dynamic" (default) the system allocates a free hostPort for the gameserver (default 7000-8000), for game clients to connect to
+          portPolicy: Dynamic
+          # The name of the container to open the port on. Defaults to the game server container if omitted or empty.
+          container: mc-server
+          # the port that is being opened on the game server process
+          containerPort: 19132
+          # Bedrock uses UDP to connect players
+          protocol: UDP
+      # Health checking for the running game server
       health:
-        initialDelaySeconds: 300 # Server must be ready within 5m + 60s or it gets recreated
+        # Number of seconds after the container has started before health check is initiated.
+        initialDelaySeconds: 300
+        # If the `Health()` function doesn't get called at least once every period (seconds), then
+        # the game server is not healthy.
         periodSeconds: 12
+        # Minimum consecutive failures for the health probe to be considered failed after having succeeded.
         failureThreshold: 5
-      # The GameServer's Pod template
       template:
         spec:
           containers:
             - name: mc-server
               image: itzg/minecraft-bedrock-server # Minecraft bedrock server image
+              imagePullPolicy: Always
               env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-bedrock-server
                 - name: EULA
                   value: "TRUE"
-              resources:
-              # Resource requests for a server of 20 max players
-                requests:
-                  memory: "2.5Gi"
-                  cpu: "1"
+              volumeMounts:
+                - mountPath: /data # shared vol with mc-load and mc-backup
+                  name: world-vol
 
             - name: mc-monitor
-              image: saulmaldonado/agones-mc-monitor # Agones SDK sidecar
+              image: saulmaldonado/agones-mc
               args:
-                - --attemps=5 # matches spec.health.failureThreshold
+                - monitor
+                - --attempts=5 # matches spec.health.failureThreshold
+                - --initial-delay=60s # matches spec.health.initialDelaySeconds
                 - --interval=10s # below spec.health.periodSecond
                 - --timeout=10s # matches interval
                 - --port=19132 # matches mc-server containerPort
                 - --edition=bedrock # bedrock edition
+              imagePullPolicy: Always
+
+            - name: mc-backup
+              image: saulmaldonado/agones-mc # backup
+              args:
+                - backup
+                - --gcp-bucket-name=agones-minecraft-mc-worlds # GCP Cloud storage bucket name for world archives
+                - --backup-cron=*/5 * * * * # crontab for recurring backups. omiting flag will only run backup once
+                - --initial-delay=60s # delay for mc-server to build world before scheduling backup jobs
+                - --edition=bedrock
+              env:
+                - name: NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name # GameServer ref for naming backup zip files
+              imagePullPolicy: Always
+              volumeMounts:
+                - mountPath: /data # shared vol with mc-server
+                  name: world-vol
+          volumes:
+            - name: world-vol # shared vol between containers. will not persist bewteen restarts
+              emptyDir: {}
