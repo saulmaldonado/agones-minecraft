@@ -1,3 +1,9 @@
+## Note: Controller is obsolete
+
+### Use this [kubernetes-sigs/external-dns fork for GameServers](https://github.com/saulmaldonado/external-dns)
+
+---
+
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
