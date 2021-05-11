@@ -2,7 +2,7 @@ apiVersion: 'agones.dev/v1'
 kind: GameServer
 metadata:
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: <DOMAIN>
+    external-dns.alpha.kubernetes.io/hostname: saulmaldonado.me.
     external-dns.alpha.kubernetes.io/gameserver-service: minecraft
   generateName: 'mc-server-' # Generates a unique name for GameServer and Pod
 spec:
@@ -37,6 +37,8 @@ spec:
           volumeMounts:
             - mountPath: /data # shared vol with mc-load and mc-backup
               name: world-vol
+          ports:
+            - containerPort: 25575 # exposes the RCON port to within the cluster from the pod's IP
 
         - name: mc-monitor
           image: saulmaldonado/agones-mc # monitor
