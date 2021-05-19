@@ -9,6 +9,11 @@ import (
 const (
 	ENV         = "ENV"
 	PORT        = "PORT"
+	DB_USER     = "DB_USER"
+	DB_PASSWORD = "DB_PASSWORD"
+	DB_HOST     = "DB_HOST"
+	DB_PORT     = "DB_PORT"
+	DB_NAME     = "DB_NAME"
 	Production  = "production"
 	Development = "development"
 )
@@ -33,6 +38,16 @@ func GetEnv() string {
 	return viper.GetString(ENV)
 }
 
+// Returns PORT from config
 func GetPort() string {
 	return viper.GetString(PORT)
+}
+
+// Returns DB_USER, DB_PASSWORD, DB_HOST, DB_PORT and DB_NAME from config
+func GetDB() (string, string, string, string, string) {
+	return viper.GetString(DB_USER),
+		viper.GetString(DB_PASSWORD),
+		viper.GetString(DB_HOST),
+		viper.GetString(DB_PORT),
+		viper.GetString(DB_NAME)
 }
