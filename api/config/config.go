@@ -7,13 +7,20 @@ import (
 )
 
 const (
-	ENV         = "ENV"
-	PORT        = "PORT"
-	DB_USER     = "DB_USER"
-	DB_PASSWORD = "DB_PASSWORD"
-	DB_HOST     = "DB_HOST"
-	DB_PORT     = "DB_PORT"
-	DB_NAME     = "DB_NAME"
+	ENV                  = "ENV"
+	PORT                 = "PORT"
+	DB_USER              = "DB_USER"
+	DB_PASSWORD          = "DB_PASSWORD"
+	DB_HOST              = "DB_HOST"
+	DB_PORT              = "DB_PORT"
+	DB_NAME              = "DB_NAME"
+	SESSION_SECRET       = "SESSION_SECRET"
+	TWITCH_CLIENT_ID     = "TWITCH_CLIENT_ID"
+	TWITCH_CLIENT_SECRET = "TWITCH_CLIENT_SECRET"
+	TWITCH_REDIRECT      = "TWITCH_REDIRECT"
+	REDIS_ADDRESS        = "REDIS_ADDRESS"
+	REDIS_PASSWORD       = "REDIS_PASSWORD"
+
 	Production  = "production"
 	Development = "development"
 )
@@ -50,4 +57,18 @@ func GetDB() (string, string, string, string, string) {
 		viper.GetString(DB_HOST),
 		viper.GetString(DB_PORT),
 		viper.GetString(DB_NAME)
+}
+
+func GetSessionSecret() (authKey []byte, encKey []byte) {
+	keys := viper.GetStringSlice(SESSION_SECRET)
+	if len(keys) < 2 {
+		log.Fatal("missing SESSION_SECRET authenticationa and encryption keys")
+	}
+	authKey = []byte(keys[0])
+	encKey = []byte(keys[1])
+	return
+}
+
+func GetTwichCreds() (clientId string, clientSecret string, redirect string) {
+	return viper.GetString(TWITCH_CLIENT_ID), viper.GetString(TWITCH_CLIENT_SECRET), viper.GetString(TWITCH_REDIRECT)
 }

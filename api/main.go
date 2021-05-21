@@ -5,6 +5,7 @@ import (
 	"agones-minecraft/db"
 	"agones-minecraft/log"
 	"agones-minecraft/routers"
+	"agones-minecraft/services/auth"
 )
 
 func main() {
@@ -12,6 +13,7 @@ func main() {
 	log.SetLog()
 	r := routers.NewRouter()
 	db.Init()
+	auth.NewStore()
 	port := config.GetPort()
 	r.Run(":" + port)
 }

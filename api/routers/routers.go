@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"net/http"
 	"time"
 
 	ginzap "github.com/gin-contrib/zap"
@@ -27,10 +28,17 @@ func NewRouter() *gin.Engine {
 		c.Next()
 	})
 
+	engine.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	v1 := engine.Group("/api/v1")
 	{
-		v1.GET("/ping", v1Controllers.Ping)
+		twitch := v1.Group("/twitch")
+		{
+			twitch.GET("/login", v1Controllers.TwitchLogin)
+			twitch.GET("/callback", v1Controllers.TwitchCallback)
+		}
 	}
-
 	return engine
 }
