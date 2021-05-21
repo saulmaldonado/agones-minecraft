@@ -1,4 +1,4 @@
-package auth
+package twtichauth
 
 import (
 	"agones-minecraft/config"

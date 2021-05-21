@@ -3,43 +3,40 @@ package v1Controllers
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"agones-minecraft/services/auth"
+	sessionsauth "agones-minecraft/services/auth/sessions"
+	twitchauth "agones-minecraft/services/auth/twitch"
 )
 
 const (
-	StateSessionKey  = "state"
 	StateCallbackKey = "state-callback"
 )
 
 func TwitchLogin(c *gin.Context) {
-	store := auth.GetStore()
-	sess, err := store.Get(c.Request, StateSessionKey)
-	if err != nil {
-		zap.L().Warn("error decoding state session", zap.Error(err))
-		err = nil
-	}
+	sess := sessions.Default(c)
 
-	state, err := auth.NewState()
+	state, err := sessionsauth.NewState()
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
-		zap.L().Error("error generating new state", zap.String("sessionId", sess.ID))
+		zap.L().Error("error generating new state", zap.Error(err))
 		return
 	}
 
 	sess.AddFlash(state, StateCallbackKey)
 
-	if err := sess.Save(c.Request, c.Writer); err != nil {
+	if err := sess.Save(); err != nil {
 		c.Status(http.StatusInternalServerError)
 		zap.L().Error("error saving session", zap.Error(err))
 		return
 	}
 
-	config := auth.NewTwitchConfig()
+	config := twitchauth.NewTwitchConfig()
 
 	http.Redirect(c.Writer, c.Request, config.AuthCodeURL(state), http.StatusTemporaryRedirect)
 }
@@ -48,16 +45,11 @@ func TwitchCallback(c *gin.Context) {
 	state := c.Query("state")
 	code := c.Query("code")
 
-	store := auth.GetStore()
-	sess, err := store.Get(c.Request, StateSessionKey)
-	if err != nil {
-		zap.L().Warn("error decoding state session")
-		err = nil
-	}
+	sess := sessions.Default(c)
 
 	stateChallenge := sess.Flashes(StateCallbackKey)
 	if state == "" {
-		fmt.Println("missing state")
+		log.Println("missing state")
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -69,15 +61,24 @@ func TwitchCallback(c *gin.Context) {
 	}
 
 	if state != stateChallenge[0] {
+		zap.L().Warn("non-matching states", zap.String("state", state), zap.String("stateChallenge", stateChallenge[0].(string)))
 		c.Status(http.StatusUnauthorized)
+		sess.Clear()
+		return
 	}
 
-	config := auth.NewTwitchConfig()
+	config := twitchauth.NewTwitchConfig()
 
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		zap.L().Error("error exchaning code for token", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if err := sess.Save(); err != nil {
+		c.Status(http.StatusInternalServerError)
+		zap.L().Error("error saving session", zap.Error(err))
 		return
 	}
 

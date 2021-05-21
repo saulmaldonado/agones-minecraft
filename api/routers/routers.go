@@ -10,6 +10,7 @@ import (
 
 	"agones-minecraft/config"
 	v1Controllers "agones-minecraft/controllers/api/v1"
+	"agones-minecraft/services/auth/sessions"
 )
 
 func NewRouter() *gin.Engine {
@@ -20,13 +21,15 @@ func NewRouter() *gin.Engine {
 	engine := gin.New()
 
 	engine.Use(ginzap.Ginzap(zap.L(), time.RFC3339, true))
-	engine.Use(ginzap.RecoveryWithZap(zap.L(), true))
+	engine.Use(ginzap.RecoveryWithZap(zap.L(), false))
 
 	engine.Use(func(c *gin.Context) {
 		// enable CORS
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Next()
 	})
+
+	engine.Use(sessions.Sessions())
 
 	engine.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
