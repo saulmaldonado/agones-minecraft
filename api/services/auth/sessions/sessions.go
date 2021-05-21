@@ -1,17 +1,22 @@
 package sessions
 
 import (
-	"agones-minecraft/config"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"net/http"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+
+	"agones-minecraft/config"
 )
 
 const (
-	SessionName = "agones-minecraft-api"
+	SessionName      = "agones-minecraft-api"
+	StateCallbackKey = "state-callback"
 )
 
 var store cookie.Store
@@ -37,4 +42,44 @@ func NewState() (string, error) {
 	}
 
 	return hex.EncodeToString(tokenBytes[:]), nil
+}
+
+func AddStateFlash(c *gin.Context, state string) error {
+	sess := sessions.Default(c)
+
+	sess.AddFlash(state, StateCallbackKey)
+
+	if err := sess.Save(); err != nil {
+		zap.L().Error("error saving session", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
+	sess := sessions.Default(c)
+
+	stateChallenge := sess.Flashes(StateCallbackKey)
+	if err := sess.Save(); err != nil {
+		zap.L().Warn("error saving session", zap.Error(err))
+	}
+
+	if state == "" {
+		c.Status(http.StatusBadRequest)
+		return false, fmt.Errorf("missing state")
+	}
+
+	if len(stateChallenge) < 1 {
+		fmt.Println("missing state challenge")
+		c.Status(http.StatusBadRequest)
+		return false, fmt.Errorf("missing state challenge")
+	}
+
+	if state != stateChallenge[0] {
+		c.Status(http.StatusUnauthorized)
+		sess.Clear()
+		return false, nil
+	}
+
+	return true, nil
 }
