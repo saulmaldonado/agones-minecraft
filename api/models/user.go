@@ -10,9 +10,9 @@ type User struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Email          string    `gorm:"not null;size:255"`
 	TwitchID       string
-	TwitchUsername string `gorm:"size:25"`
-	MCUsername     string `gorm:"size:16"`
-	MCUUID         string `gorm:"type:uuid"`
+	TwitchUsername string    `gorm:"size:25"`
+	MCUsername     string    `gorm:"size:16"`
+	MCUUID         uuid.UUID `gorm:"type:uuid"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
