@@ -6,6 +6,7 @@ import (
 	"agones-minecraft/log"
 	"agones-minecraft/routers"
 	"agones-minecraft/services/auth/sessions"
+	twitch "agones-minecraft/services/auth/twitch"
 )
 
 func main() {
@@ -14,6 +15,8 @@ func main() {
 
 	sessions.NewStore()
 	db.Init()
+
+	twitch.NewODICProvider()
 
 	r := routers.NewRouter()
 

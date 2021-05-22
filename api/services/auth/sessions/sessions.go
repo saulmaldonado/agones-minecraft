@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"crypto/rand"
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 
 	"agones-minecraft/config"
 )
@@ -17,11 +19,13 @@ import (
 const (
 	SessionName      = "agones-minecraft-api"
 	StateCallbackKey = "state-callback"
+	TokenKey         = "token"
 )
 
 var store cookie.Store
 
 func NewStore() cookie.Store {
+	gob.Register(oauth2.Token{})
 	authKey, encKey := config.GetSessionSecret()
 	store = cookie.NewStore(authKey, encKey)
 	return store
@@ -82,4 +86,13 @@ func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func AddToken(c *gin.Context, tk *oauth2.Token) error {
+	sess := sessions.Default(c)
+	sess.Set(TokenKey, tk)
+	if err := sess.Save(); err != nil {
+		return err
+	}
+	return nil
 }
