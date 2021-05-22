@@ -24,7 +24,12 @@ func Init() {
 	var err error
 	logger := zapgorm2.New(zap.L())
 	logger.SlowThreshold = DefaultThreshold
-	logger.LogLevel = gormlogger.Info
+
+	if config.GetEnv() == config.Production {
+		logger.IgnoreRecordNotFoundError = true
+	} else {
+		logger.LogLevel = gormlogger.Info
+	}
 
 	user, pw, host, port, name := config.GetDB()
 
