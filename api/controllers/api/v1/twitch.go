@@ -9,6 +9,9 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"agones-minecraft/models"
+	userv1Resource "agones-minecraft/resource/api/v1/user"
+	userv1 "agones-minecraft/services/api/v1/user"
 	sessionsauth "agones-minecraft/services/auth/sessions"
 	twitchauth "agones-minecraft/services/auth/twitch"
 )
@@ -90,5 +93,39 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, token)
+	var user models.User
+
+	if err := userv1.GetUserByEmail(claims.Email, &user); err != nil {
+		user.Email = claims.Email
+		user.TwitchUsername = userInfo.Username
+
+		if err := userv1.CreateUser(&user); err != nil {
+			zap.L().Error(
+				"error creating new user",
+				zap.String("email", claims.Email),
+				zap.String("username", userInfo.Username),
+			)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		zap.L().Info(
+			"new user created",
+			zap.String("id", user.ID.String()),
+			zap.String("email", user.Email),
+			zap.String("username", user.TwitchUsername),
+		)
+	}
+
+	foundUser := userv1Resource.User{
+		ID:             user.ID,
+		Email:          user.Email,
+		TwitchUsername: &user.TwitchUsername,
+		CreatedAt:      user.CreatedAt,
+		UpdatedAt:      user.UpdatedAt,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": token,
+		"user":  foundUser,
+	})
 }
