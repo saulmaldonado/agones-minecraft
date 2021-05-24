@@ -2,12 +2,12 @@ package v1Controllers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/oauth2"
 
 	"agones-minecraft/models"
@@ -23,13 +23,13 @@ func TwitchLogin(c *gin.Context) {
 
 	state, err := sessionsauth.NewState()
 	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError("error generating state", err))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
 	if err := sessionsauth.AddStateFlash(c, state); err != nil {
 
-		c.Errors = append(c.Errors, errors.NewInternalServerError("error saving state to flash", err))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 	claims := oauth2.SetAuthURLParam("claims", `{ "id_token": { "email": null, "email_verified": null }, "userinfo": { "picture": null, "preferred_username": null } }`)
@@ -44,14 +44,10 @@ func TwitchCallback(c *gin.Context) {
 	if err != nil || !ok {
 		c.Errors = append(c.Errors,
 			&gin.Error{
+				Err: err,
 				Meta: errors.APIError{
 					StatusCode:   http.StatusBadRequest,
 					ErrorMessage: "Error verifying authentication request. Make sure cookies are enabled.",
-					InternalError: &errors.InternalError{
-						Message: "failed state challenge. possible CSRF attack attempt.",
-						Level:   zap.WarnLevel,
-						Fields:  []zapcore.Field{zap.String("IP", c.ClientIP()), zap.Error(err)},
-					},
 				},
 			},
 		)
@@ -62,34 +58,34 @@ func TwitchCallback(c *gin.Context) {
 
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError("error exchanging code for Twitch token", err))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 
 	if !ok {
-		c.Errors = append(c.Errors, errors.NewInternalServerError("missing id_token from Twitch exchange request", nil))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(fmt.Errorf("id_token not included in token")))
 		return
 	}
 
 	idToken, err := twitchauth.VerifyToken(config.ClientID, rawIDToken)
 	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError("error verifying token", err))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
 	var claims twitchauth.Claims
 
 	if err := twitchauth.GetClaimsFromToken(idToken, &claims); err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError("error extracting claims from token", err))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
 	var userInfo twitchauth.UserInfo
 
 	if err := twitchauth.GetUserInfo(token.AccessToken, &userInfo); err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError("error getting userinfo", err))
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
@@ -103,17 +99,10 @@ func TwitchCallback(c *gin.Context) {
 		if err := userv1.CreateUser(&user); err != nil {
 			c.Errors = append(c.Errors,
 				&gin.Error{
+					Err: err,
 					Meta: errors.APIError{
 						StatusCode:   http.StatusInternalServerError,
 						ErrorMessage: errors.InternalServerErrorMsg,
-						InternalError: &errors.InternalError{
-							Message: "error creating user",
-							Fields: []zapcore.Field{
-								zap.String("email", claims.Email),
-								zap.String("username", userInfo.Username),
-								zap.Error(err),
-							},
-						},
 					},
 				},
 			)
