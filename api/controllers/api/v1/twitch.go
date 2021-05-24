@@ -14,6 +14,7 @@ import (
 	"agones-minecraft/resource/api/v1/errors"
 	userv1Resource "agones-minecraft/resource/api/v1/user"
 	userv1 "agones-minecraft/services/api/v1/user"
+	"agones-minecraft/services/auth/jwt"
 	sessionsauth "agones-minecraft/services/auth/sessions"
 	twitchauth "agones-minecraft/services/auth/twitch"
 )
@@ -125,8 +126,23 @@ func TwitchCallback(c *gin.Context) {
 		UpdatedAt:      user.UpdatedAt,
 	}
 
+	accessToken, err := jwt.NewAccessToken(foundUser.ID)
+	if err != nil {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
+
+	refreshToken, err := jwt.NewRefreshToken(foundUser.ID)
+	if err != nil {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
+
 	c.JSON(statusCode, gin.H{
-		"token": token,
-		"user":  foundUser,
+		"token": gin.H{
+			"accessToken":  accessToken,
+			"refreshToken": refreshToken,
+		},
+		"user": foundUser,
 	})
 }

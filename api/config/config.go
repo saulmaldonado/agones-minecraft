@@ -20,6 +20,7 @@ const (
 	TWITCH_REDIRECT      = "TWITCH_REDIRECT"
 	REDIS_ADDRESS        = "REDIS_ADDRESS"
 	REDIS_PASSWORD       = "REDIS_PASSWORD"
+	JWT_SECRET           = "JWT_SECRET"
 
 	Production  = "production"
 	Development = "development"
@@ -71,4 +72,8 @@ func GetSessionSecret() (authKey []byte, encKey []byte) {
 
 func GetTwichCreds() (clientId string, clientSecret string, redirect string) {
 	return viper.GetString(TWITCH_CLIENT_ID), viper.GetString(TWITCH_CLIENT_SECRET), viper.GetString(TWITCH_REDIRECT)
+}
+
+func GetJWTSecret() string {
+	return viper.GetString(JWT_SECRET)
 }

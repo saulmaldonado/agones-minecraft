@@ -46,6 +46,9 @@ func NewState() (string, error) {
 func AddStateFlash(c *gin.Context, state string) error {
 	sess := sessions.Default(c)
 
+	// clear the session if its not new.
+	sess.Clear()
+
 	sess.AddFlash(state, StateCallbackKey)
 
 	if err := sess.Save(); err != nil {
