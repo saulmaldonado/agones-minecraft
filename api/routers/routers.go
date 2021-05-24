@@ -44,6 +44,10 @@ func NewRouter() *gin.Engine {
 			twitch.GET("/login", v1Controllers.TwitchLogin)
 			twitch.GET("/callback", v1Controllers.TwitchCallback)
 		}
+		auth := v1.Group("/auth")
+		{
+			auth.GET("/refresh", v1Controllers.Refresh)
+		}
 	}
 	return engine
 }

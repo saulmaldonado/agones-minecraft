@@ -39,7 +39,15 @@ func Ginzap(logger *zap.Logger, timeFormat string, utc bool) gin.HandlerFunc {
 
 		if len(c.Errors) > 0 {
 			// Append error field if this is an erroneous request.
-			for _, e := range c.Errors.Errors() {
+			errs := []string{}
+
+			for _, e := range c.Errors {
+				if e.Type != gin.ErrorTypeBind {
+					errs = append(errs, e.Error())
+				}
+			}
+
+			for _, e := range errs {
 				logger.Error(e)
 			}
 		}
