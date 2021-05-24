@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"time"
 
-	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
 	"agones-minecraft/config"
 	v1Controllers "agones-minecraft/controllers/api/v1"
 	"agones-minecraft/middleware/errors"
+	ginzap "agones-minecraft/middleware/log"
 	"agones-minecraft/middleware/session"
 )
 
