@@ -10,7 +10,8 @@ import (
 
 	"agones-minecraft/config"
 	v1Controllers "agones-minecraft/controllers/api/v1"
-	"agones-minecraft/services/auth/sessions"
+	"agones-minecraft/middleware/errors"
+	"agones-minecraft/middleware/session"
 )
 
 func NewRouter() *gin.Engine {
@@ -29,7 +30,8 @@ func NewRouter() *gin.Engine {
 		c.Next()
 	})
 
-	engine.Use(sessions.Sessions())
+	engine.Use(session.Sessions())
+	engine.Use(errors.HandleErrors())
 
 	engine.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

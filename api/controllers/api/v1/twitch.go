@@ -7,9 +7,11 @@ import (
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/oauth2"
 
 	"agones-minecraft/models"
+	"agones-minecraft/resource/api/v1/errors"
 	userv1Resource "agones-minecraft/resource/api/v1/user"
 	userv1 "agones-minecraft/services/api/v1/user"
 	sessionsauth "agones-minecraft/services/auth/sessions"
@@ -21,18 +23,16 @@ func TwitchLogin(c *gin.Context) {
 
 	state, err := sessionsauth.NewState()
 	if err != nil {
-		zap.L().Error("error generating new state", zap.Error(err))
-		c.Status(http.StatusInternalServerError)
+		c.Errors = append(c.Errors, errors.NewInternalServerError("error generating state", err))
 		return
 	}
 
 	if err := sessionsauth.AddStateFlash(c, state); err != nil {
-		c.Status(http.StatusInternalServerError)
+
+		c.Errors = append(c.Errors, errors.NewInternalServerError("error saving state to flash", err))
 		return
 	}
-
 	claims := oauth2.SetAuthURLParam("claims", `{ "id_token": { "email": null, "email_verified": null }, "userinfo": { "picture": null, "preferred_username": null } }`)
-
 	http.Redirect(c.Writer, c.Request, config.AuthCodeURL(state, claims), http.StatusTemporaryRedirect)
 }
 
@@ -41,15 +41,20 @@ func TwitchCallback(c *gin.Context) {
 	code := c.Query("code")
 
 	ok, err := sessionsauth.VerifyStateFlash(c, state)
-	if err != nil {
-		c.Status(http.StatusBadRequest)
-		zap.L().Error("error verifying state", zap.Error(err))
-		return
-	}
-
-	if !ok {
-		c.Status(http.StatusUnauthorized)
-		zap.L().Warn("failed state challenge")
+	if err != nil || !ok {
+		c.Errors = append(c.Errors,
+			&gin.Error{
+				Meta: errors.APIError{
+					StatusCode:   http.StatusBadRequest,
+					ErrorMessage: "Error verifying authentication request. Make sure cookies are enabled.",
+					InternalError: &errors.InternalError{
+						Message: "failed state challenge. possible CSRF attack attempt.",
+						Level:   zap.WarnLevel,
+						Fields:  []zapcore.Field{zap.String("IP", c.ClientIP()), zap.Error(err)},
+					},
+				},
+			},
+		)
 		return
 	}
 
@@ -57,57 +62,64 @@ func TwitchCallback(c *gin.Context) {
 
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
-		zap.L().Error("error exchaning code for token", zap.Error(err))
-		c.Status(http.StatusInternalServerError)
+		c.Errors = append(c.Errors, errors.NewInternalServerError("error exchanging code for Twitch token", err))
 		return
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 
 	if !ok {
-		zap.L().Error("missing id_token")
-		c.Status(http.StatusInternalServerError)
+		c.Errors = append(c.Errors, errors.NewInternalServerError("missing id_token from Twitch exchange request", nil))
 		return
 	}
 
 	idToken, err := twitchauth.VerifyToken(config.ClientID, rawIDToken)
 	if err != nil {
-		zap.L().Error("error verifying token", zap.Error(err))
-		c.Status(http.StatusBadRequest)
+		c.Errors = append(c.Errors, errors.NewInternalServerError("error verifying token", err))
 		return
 	}
 
 	var claims twitchauth.Claims
 
 	if err := twitchauth.GetClaimsFromToken(idToken, &claims); err != nil {
-		zap.L().Error("error extracting claims from token", zap.Error(err))
-		c.Status(http.StatusInternalServerError)
+		c.Errors = append(c.Errors, errors.NewInternalServerError("error extracting claims from token", err))
 		return
 	}
 
 	var userInfo twitchauth.UserInfo
 
 	if err := twitchauth.GetUserInfo(token.AccessToken, &userInfo); err != nil {
-		zap.L().Error("error getting userinfo", zap.Error(err))
-		c.Status(http.StatusInternalServerError)
+		c.Errors = append(c.Errors, errors.NewInternalServerError("error getting userinfo", err))
 		return
 	}
 
 	var user models.User
+	var statusCode int = http.StatusOK
 
 	if err := userv1.GetUserByEmail(claims.Email, &user); err != nil {
 		user.Email = claims.Email
 		user.TwitchUsername = userInfo.Username
 
 		if err := userv1.CreateUser(&user); err != nil {
-			zap.L().Error(
-				"error creating new user",
-				zap.String("email", claims.Email),
-				zap.String("username", userInfo.Username),
+			c.Errors = append(c.Errors,
+				&gin.Error{
+					Meta: errors.APIError{
+						StatusCode:   http.StatusInternalServerError,
+						ErrorMessage: errors.InternalServerErrorMsg,
+						InternalError: &errors.InternalError{
+							Message: "error creating user",
+							Fields: []zapcore.Field{
+								zap.String("email", claims.Email),
+								zap.String("username", userInfo.Username),
+								zap.Error(err),
+							},
+						},
+					},
+				},
 			)
-			c.Status(http.StatusInternalServerError)
 			return
 		}
+		statusCode = http.StatusCreated
 		zap.L().Info(
 			"new user created",
 			zap.String("id", user.ID.String()),
@@ -124,7 +136,7 @@ func TwitchCallback(c *gin.Context) {
 		UpdatedAt:      user.UpdatedAt,
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(statusCode, gin.H{
 		"token": token,
 		"user":  foundUser,
 	})

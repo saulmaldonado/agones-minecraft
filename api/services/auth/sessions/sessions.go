@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -22,21 +21,17 @@ const (
 	TokenKey         = "token"
 )
 
-var store cookie.Store
+var Store cookie.Store
 
 func NewStore() cookie.Store {
 	gob.Register(oauth2.Token{})
 	authKey, encKey := config.GetSessionSecret()
-	store = cookie.NewStore(authKey, encKey)
-	return store
+	Store = cookie.NewStore(authKey, encKey)
+	return Store
 }
 
 func GetStore() cookie.Store {
-	return store
-}
-
-func Sessions() gin.HandlerFunc {
-	return sessions.Sessions(SessionName, store)
+	return Store
 }
 
 func NewState() (string, error) {
@@ -54,7 +49,6 @@ func AddStateFlash(c *gin.Context, state string) error {
 	sess.AddFlash(state, StateCallbackKey)
 
 	if err := sess.Save(); err != nil {
-		zap.L().Error("error saving session", zap.Error(err))
 		return err
 	}
 	return nil
@@ -69,18 +63,14 @@ func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
 	}
 
 	if state == "" {
-		c.Status(http.StatusBadRequest)
 		return false, fmt.Errorf("missing state")
 	}
 
 	if len(stateChallenge) < 1 {
-		fmt.Println("missing state challenge")
-		c.Status(http.StatusBadRequest)
 		return false, fmt.Errorf("missing state challenge")
 	}
 
 	if state != stateChallenge[0] {
-		c.Status(http.StatusUnauthorized)
 		sess.Clear()
 		return false, nil
 	}
