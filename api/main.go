@@ -5,6 +5,7 @@ import (
 	"agones-minecraft/db"
 	"agones-minecraft/log"
 	"agones-minecraft/routers"
+	"agones-minecraft/services/auth/jwt"
 	"agones-minecraft/services/auth/sessions"
 	twitch "agones-minecraft/services/auth/twitch"
 )
@@ -17,7 +18,7 @@ func main() {
 	db.Init()
 
 	twitch.NewODICProvider()
-
+	jwt.New()
 	r := routers.NewRouter()
 
 	port := config.GetPort()

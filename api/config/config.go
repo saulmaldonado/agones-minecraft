@@ -77,3 +77,7 @@ func GetTwichCreds() (clientId string, clientSecret string, redirect string) {
 func GetJWTSecret() string {
 	return viper.GetString(JWT_SECRET)
 }
+
+func GetRedisCreds() (address string, password string) {
+	return viper.GetString(REDIS_ADDRESS), viper.GetString(REDIS_PASSWORD)
+}
