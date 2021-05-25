@@ -3,6 +3,7 @@ package jwt
 import (
 	"agones-minecraft/config"
 	"context"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -12,7 +13,7 @@ var TokenStore JWTStore
 
 // Client interface for storing, checking, and deleting tokenId from a store
 type JWTStore interface {
-	Add(tokenId string) error
+	Add(tokenId string, userId string, exp time.Time) error
 	Exists(tokenId string) error
 	Delete(tokenId string) error
 }
@@ -40,8 +41,8 @@ func Get() JWTStore {
 }
 
 // Check if the tokenId exists in the store
-func (r *RedisStore) Add(tokenId string) error {
-	return r.redis.SAdd(context.Background(), tokenId).Err()
+func (r *RedisStore) Add(tokenId, userId string, exp time.Time) error {
+	return r.redis.Set(context.Background(), tokenId, userId, time.Until(exp)).Err()
 }
 
 // Check if the tokenId exists in the store

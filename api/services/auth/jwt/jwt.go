@@ -23,8 +23,11 @@ const (
 
 // Access and Refresh token pair
 type TokenPair struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+	AccessToken     string    `json:"accessToken"`
+	RefreshToken    string    `json:"refreshToken"`
+	AccessTokenExp  time.Time `json:"accessTokenExp"`
+	RefreshTokenExp time.Time `json:"refreshTokenExp"`
+	TokenId         string    `json:"-"`
 }
 
 // Generates new refresh and access tokens for the given userId with the same iss, iat, id, and sub claims.
@@ -32,10 +35,11 @@ type TokenPair struct {
 // sub is the given userId
 // "refresh" is a custom claim to identify between refresh and access token
 func NewTokens(userId string) (*TokenPair, error) {
+	id := uuid.NewString()
 	a := jwt.New()
 	a.Set(jwt.IssuerKey, Issuer)
 	a.Set(jwt.IssuedAtKey, time.Now().Unix())
-	a.Set(jwt.JwtIDKey, uuid.NewString())
+	a.Set(jwt.JwtIDKey, id)
 	a.Set(jwt.SubjectKey, userId)
 
 	r, err := a.Clone()
@@ -46,8 +50,13 @@ func NewTokens(userId string) (*TokenPair, error) {
 	a.Set(RefreshKey, false)
 	r.Set(RefreshKey, true)
 
-	a.Set(jwt.ExpirationKey, time.Now().Add(AccessTokenTimeout))
-	r.Set(jwt.ExpirationKey, time.Now().Add(RefreshTokenTimeout))
+	now := time.Now()
+
+	aExp := now.Add(AccessTokenTimeout)
+	rExp := now.Add(RefreshTokenTimeout)
+
+	a.Set(jwt.ExpirationKey, aExp.Unix())
+	r.Set(jwt.ExpirationKey, rExp.Unix())
 
 	accessTokenKey := config.GetJWTSecret()
 	// TODO: have a different refresh token key
@@ -63,7 +72,13 @@ func NewTokens(userId string) (*TokenPair, error) {
 		return nil, err
 	}
 
-	return &TokenPair{AccessToken: string(accessToken), RefreshToken: string(refreshToken)}, err
+	return &TokenPair{
+		AccessToken:     string(accessToken),
+		RefreshToken:    string(refreshToken),
+		AccessTokenExp:  aExp,
+		RefreshTokenExp: rExp,
+		TokenId:         id,
+	}, nil
 }
 
 // Will parse token string into jwt.Token without verification or validation
