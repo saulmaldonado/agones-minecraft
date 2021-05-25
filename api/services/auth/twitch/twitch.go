@@ -1,4 +1,4 @@
-package twtichauth
+package twitch
 
 import (
 	"agones-minecraft/config"

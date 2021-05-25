@@ -7,7 +7,7 @@ import (
 	"agones-minecraft/routers"
 	"agones-minecraft/services/auth/jwt"
 	"agones-minecraft/services/auth/sessions"
-	twitch "agones-minecraft/services/auth/twitch"
+	"agones-minecraft/services/auth/twitch"
 )
 
 func main() {

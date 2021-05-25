@@ -15,11 +15,11 @@ import (
 	userv1 "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/auth/jwt"
 	sessionsauth "agones-minecraft/services/auth/sessions"
-	twitchauth "agones-minecraft/services/auth/twitch"
+	"agones-minecraft/services/auth/twitch"
 )
 
 func TwitchLogin(c *gin.Context) {
-	config := twitchauth.NewTwitchConfig(twitchauth.TwitchOIDCProvider, oidc.ScopeOpenID, "user:read:email")
+	config := twitch.NewTwitchConfig(twitch.TwitchOIDCProvider, oidc.ScopeOpenID, "user:read:email")
 
 	state, err := sessionsauth.NewState()
 	if err != nil {
@@ -45,7 +45,7 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	config := twitchauth.NewTwitchConfig(twitchauth.TwitchOIDCProvider)
+	config := twitch.NewTwitchConfig(twitch.TwitchOIDCProvider)
 
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
@@ -53,7 +53,7 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	payload, err := twitchauth.GetPayload(token, config.ClientID)
+	payload, err := twitch.GetPayload(token, config.ClientID)
 	if err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
