@@ -46,7 +46,7 @@ func NewRouter() *gin.Engine {
 		}
 		auth := v1.Group("/auth")
 		{
-			auth.GET("/refresh", v1Controllers.Refresh)
+			auth.POST("/refresh", v1Controllers.Refresh)
 		}
 	}
 	return engine
