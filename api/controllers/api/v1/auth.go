@@ -1,13 +1,12 @@
 package v1Controllers
 
 import (
+	"agones-minecraft/resource/api/v1/errors"
+	"agones-minecraft/services/auth/jwt"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-
-	"agones-minecraft/resource/api/v1/errors"
-	"agones-minecraft/services/auth/jwt"
 )
 
 type VerifyBody struct {
@@ -17,44 +16,42 @@ type VerifyBody struct {
 func Refresh(c *gin.Context) {
 	var body VerifyBody
 	if err := c.BindJSON(&body); err != nil {
-		c.Errors = append(c.Errors, &gin.Error{
-			Err:  err,
-			Type: gin.ErrorTypeBind,
-			Meta: errors.APIError{
-				StatusCode:   http.StatusBadRequest,
-				ErrorMessage: err.Error(),
-			},
-		})
+		c.Errors = append(c.Errors, errors.NewBadRequestError(err))
 		return
 	}
 
-	jwtToken, err := jwt.GetRefreshToken(body.RefreshToken)
+	token, err := jwt.ParseToken(body.RefreshToken)
 	if err != nil {
-		c.Errors = append(c.Errors, &gin.Error{
-			Err:  err,
-			Type: gin.ErrorTypeBind,
-			Meta: errors.APIError{
-				StatusCode:   http.StatusUnauthorized,
-				ErrorMessage: err.Error(),
-			},
-		})
+		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("unable to parse token")))
 		return
 	}
 
-	tokenClaims := jwtToken.Claims.(*jwt.Claims)
-	accessToken, err := jwt.NewAccessToken(uuid.MustParse(tokenClaims.UserID))
-	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+	v, _ := token.Get(jwt.RefreshKey)
+
+	if !v.(bool) {
+		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("token identified as access token")))
 		return
 	}
 
-	refreshToken, err := jwt.NewRefreshToken(uuid.MustParse(tokenClaims.UserID))
+	if err := jwt.ValidateToken(token); err != nil {
+		c.Errors = append(c.Errors, errors.NewUnauthorizedError(err))
+		return
+	}
+
+	if err := jwt.VerifyRefreshToken(body.RefreshToken); err != nil {
+		c.Errors = append(c.Errors, errors.NewUnauthorizedError(fmt.Errorf("unable to verify refresh token")))
+		return
+	}
+
+	userId := token.Subject()
+
+	tokens, err := jwt.NewTokens(userId)
 	if err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"accessToken":  accessToken,
-		"refreshToken": refreshToken,
+		"tokens": tokens,
 	})
 }

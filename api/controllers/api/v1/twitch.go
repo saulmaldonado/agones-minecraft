@@ -87,23 +87,14 @@ func TwitchCallback(c *gin.Context) {
 		UpdatedAt:      user.UpdatedAt,
 	}
 
-	accessToken, err := jwt.NewAccessToken(foundUser.ID)
-	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		return
-	}
-
-	refreshToken, err := jwt.NewRefreshToken(foundUser.ID)
+	tokens, err := jwt.NewTokens(foundUser.ID.String())
 	if err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
 	c.JSON(statusCode, gin.H{
-		"token": gin.H{
-			"accessToken":  accessToken,
-			"refreshToken": refreshToken,
-		},
-		"user": foundUser,
+		"token": tokens,
+		"user":  foundUser,
 	})
 }
