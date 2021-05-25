@@ -2,7 +2,6 @@ package v1Controllers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/coreos/go-oidc"
@@ -29,7 +28,6 @@ func TwitchLogin(c *gin.Context) {
 	}
 
 	if err := sessionsauth.AddStateFlash(c, state); err != nil {
-
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
@@ -43,15 +41,7 @@ func TwitchCallback(c *gin.Context) {
 
 	ok, err := sessionsauth.VerifyStateFlash(c, state)
 	if err != nil || !ok {
-		c.Errors = append(c.Errors,
-			&gin.Error{
-				Err: err,
-				Meta: errors.APIError{
-					StatusCode:   http.StatusBadRequest,
-					ErrorMessage: "Error verifying authentication request. Make sure cookies are enabled.",
-				},
-			},
-		)
+		c.Errors = append(c.Errors, errors.NewBadRequestError(err))
 		return
 	}
 
@@ -63,29 +53,8 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	rawIDToken, ok := token.Extra("id_token").(string)
-
-	if !ok {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(fmt.Errorf("id_token not included in token")))
-		return
-	}
-
-	idToken, err := twitchauth.VerifyToken(config.ClientID, rawIDToken)
+	payload, err := twitchauth.GetPayload(token, config.ClientID)
 	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		return
-	}
-
-	var claims twitchauth.Claims
-
-	if err := twitchauth.GetClaimsFromToken(idToken, &claims); err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		return
-	}
-
-	var userInfo twitchauth.UserInfo
-
-	if err := twitchauth.GetUserInfo(token.AccessToken, &userInfo); err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
@@ -93,20 +62,12 @@ func TwitchCallback(c *gin.Context) {
 	var user models.User
 	var statusCode int = http.StatusOK
 
-	if err := userv1.GetUserByEmail(claims.Email, &user); err != nil {
-		user.Email = claims.Email
-		user.TwitchUsername = userInfo.Username
+	if err := userv1.GetUserByEmail(payload.Email, &user); err != nil {
+		user.Email = payload.Email
+		user.TwitchUsername = payload.Username
 
 		if err := userv1.CreateUser(&user); err != nil {
-			c.Errors = append(c.Errors,
-				&gin.Error{
-					Err: err,
-					Meta: errors.APIError{
-						StatusCode:   http.StatusInternalServerError,
-						ErrorMessage: errors.InternalServerErrorMsg,
-					},
-				},
-			)
+			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 			return
 		}
 		statusCode = http.StatusCreated

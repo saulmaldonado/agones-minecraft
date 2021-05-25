@@ -1,7 +1,7 @@
 package errors
 
 import (
-	v1Error "agones-minecraft/resource/api/v1/errors"
+	"agones-minecraft/resource/api/v1/errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,7 +11,7 @@ func HandleErrors() gin.HandlerFunc {
 		c.Next()
 
 		if err := c.Errors.Last(); err != nil {
-			if e, ok := err.Meta.(v1Error.APIError); ok {
+			if e, ok := err.Err.(*errors.APIError); ok {
 				c.JSON(e.StatusCode, e)
 			}
 		}

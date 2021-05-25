@@ -17,6 +17,11 @@ const (
 	userInfoEndpoint = "https://id.twitch.tv/oauth2/userinfo"
 )
 
+type Payload struct {
+	Claims
+	UserInfo
+}
+
 type Claims struct {
 	Iss           string `json:"iss"`
 	Sub           string `json:"sub"`
@@ -109,4 +114,34 @@ func GetClaimsFromToken(idToken *oidc.IDToken, claims *Claims) error {
 		return err
 	}
 	return nil
+}
+
+func GetPayload(token *oauth2.Token, clientId string) (*Payload, error) {
+	rawIDToken, ok := token.Extra("id_token").(string)
+
+	if !ok {
+		return nil, fmt.Errorf("id_token not included in token")
+	}
+
+	idToken, err := VerifyToken(clientId, rawIDToken)
+	if err != nil {
+		return nil, err
+	}
+
+	var claims Claims
+
+	if err := GetClaimsFromToken(idToken, &claims); err != nil {
+		return nil, err
+	}
+
+	var userInfo UserInfo
+
+	if err := GetUserInfo(token.AccessToken, &userInfo); err != nil {
+		return nil, err
+	}
+
+	return &Payload{
+		Claims:   claims,
+		UserInfo: userInfo,
+	}, nil
 }

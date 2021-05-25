@@ -11,8 +11,9 @@ const (
 )
 
 type APIError struct {
-	StatusCode   int    `json:"code"`
-	ErrorMessage string `json:"message"`
+	Err          error  `json:"-"`
+	ErrorMessage string `json:"errorMessage"`
+	StatusCode   int    `json:"statusCode"`
 }
 
 func (e *APIError) Error() string {
@@ -25,10 +26,33 @@ func (e *APIError) HTTPCode() int {
 
 func NewInternalServerError(err error) *gin.Error {
 	return &gin.Error{
-		Err: err,
-		Meta: APIError{
-			StatusCode:   http.StatusInternalServerError,
+		Err: &APIError{
+			Err:          err,
 			ErrorMessage: InternalServerErrorMsg,
+			StatusCode:   http.StatusInternalServerError,
 		},
+		Type: gin.ErrorTypeAny,
+	}
+}
+
+func NewBadRequestError(err error) *gin.Error {
+	return &gin.Error{
+		Err: &APIError{
+			Err:          nil,
+			ErrorMessage: err.Error(),
+			StatusCode:   http.StatusBadRequest,
+		},
+		Type: gin.ErrorTypeAny,
+	}
+}
+
+func NewUnauthorizedError(err error) *gin.Error {
+	return &gin.Error{
+		Err: &APIError{
+			Err:          nil,
+			ErrorMessage: err.Error(),
+			StatusCode:   http.StatusUnauthorized,
+		},
+		Type: gin.ErrorTypeAny,
 	}
 }
