@@ -2,6 +2,7 @@ package v1Controllers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/coreos/go-oidc"
@@ -59,12 +60,18 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
+	if !payload.EmailVerified {
+		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("twitch email not verified")))
+	}
+
 	var user models.User
 	var statusCode int = http.StatusOK
 
-	if err := userv1.GetUserByEmail(payload.Email, &user); err != nil {
-		user.Email = payload.Email
-		user.TwitchUsername = payload.Username
+	if err := userv1.GetUserByTwitchId(payload.Sub, &user); err != nil {
+		user.Email = &payload.Email
+		user.EmailVerified = &payload.EmailVerified
+		user.TwitchID = &payload.Sub
+		user.TwitchUsername = &payload.Username
 		user.TwitchAccessToken = &token.AccessToken
 		user.TwitchRefreshToken = &token.RefreshToken
 
@@ -76,15 +83,17 @@ func TwitchCallback(c *gin.Context) {
 		zap.L().Info(
 			"new user created",
 			zap.String("id", user.ID.String()),
-			zap.String("email", user.Email),
-			zap.String("username", user.TwitchUsername),
+			zap.String("email", *user.Email),
+			zap.String("username", *user.TwitchUsername),
 		)
 	}
 
 	foundUser := userv1Resource.User{
 		ID:             user.ID,
-		Email:          user.Email,
-		TwitchUsername: &user.TwitchUsername,
+		Email:          *user.Email,
+		EmailVerified:  *user.EmailVerified,
+		TwitchID:       user.TwitchID,
+		TwitchUsername: user.TwitchUsername,
 		CreatedAt:      user.CreatedAt,
 		UpdatedAt:      user.UpdatedAt,
 	}

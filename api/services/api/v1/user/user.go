@@ -14,6 +14,13 @@ func GetUserByEmail(email string, user *models.User) error {
 	return nil
 }
 
+func GetUserByTwitchId(twitchId string, user *models.User) error {
+	if res := db.DB().Where("twitch_id = ?", twitchId).First(user); res.Error != nil {
+		return res.Error
+	}
+	return nil
+}
+
 func GetUserById(userId string, user *models.User) error {
 	id, err := uuid.Parse(userId)
 	if err != nil {
