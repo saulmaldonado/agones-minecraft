@@ -7,12 +7,14 @@ import (
 
 type User struct {
 	gorm.Model
-	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Email          string    `gorm:"not null;size:255"`
-	TwitchID       string
-	TwitchUsername string    `gorm:"size:25"`
-	MCUsername     string    `gorm:"size:16"`
-	MCUUID         uuid.UUID `gorm:"type:uuid"`
+	ID                 uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Email              string    `gorm:"not null;size:255"`
+	TwitchID           string
+	TwitchUsername     string    `gorm:"size:25"`
+	TwitchAccessToken  *string   `gorm:"not null"`
+	TwitchRefreshToken *string   `gorm:"not null"`
+	MCUsername         string    `gorm:"size:16"`
+	MCUUID             uuid.UUID `gorm:"type:uuid"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {

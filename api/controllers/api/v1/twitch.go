@@ -65,6 +65,8 @@ func TwitchCallback(c *gin.Context) {
 	if err := userv1.GetUserByEmail(payload.Email, &user); err != nil {
 		user.Email = payload.Email
 		user.TwitchUsername = payload.Username
+		user.TwitchAccessToken = &token.AccessToken
+		user.TwitchRefreshToken = &token.RefreshToken
 
 		if err := userv1.CreateUser(&user); err != nil {
 			c.Errors = append(c.Errors, errors.NewInternalServerError(err))

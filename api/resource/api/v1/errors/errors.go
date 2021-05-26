@@ -56,3 +56,14 @@ func NewUnauthorizedError(err error) *gin.Error {
 		Type: gin.ErrorTypeAny,
 	}
 }
+
+func NewNotFoundError(err error) *gin.Error {
+	return &gin.Error{
+		Err: &APIError{
+			Err:          nil,
+			ErrorMessage: err.Error(),
+			StatusCode:   http.StatusNotFound,
+		},
+		Type: gin.ErrorTypeAny,
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"agones-minecraft/config"
 	v1Controllers "agones-minecraft/controllers/api/v1"
 	"agones-minecraft/middleware/errors"
+	"agones-minecraft/middleware/jwt"
 	ginzap "agones-minecraft/middleware/log"
 	"agones-minecraft/middleware/session"
 )
@@ -47,6 +48,12 @@ func NewRouter() *gin.Engine {
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/refresh", v1Controllers.Refresh)
+		}
+
+		user := v1.Group("/user")
+		{
+			user.Use(jwt.Authorizer())
+			user.GET("/me", v1Controllers.GetMe)
 		}
 	}
 	return engine

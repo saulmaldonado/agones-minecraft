@@ -15,6 +15,7 @@ import (
 const (
 	oidcIssuer       = "https://id.twitch.tv/oauth2"
 	userInfoEndpoint = "https://id.twitch.tv/oauth2/userinfo"
+	validateEndpoint = "https://id.twitch.tv/oauth2/validate"
 )
 
 type Payload struct {
@@ -144,4 +145,31 @@ func GetPayload(token *oauth2.Token, clientId string) (*Payload, error) {
 		Claims:   claims,
 		UserInfo: userInfo,
 	}, nil
+}
+
+func ValidateToken(accessToken string) error {
+	req, err := http.NewRequest("GET", validateEndpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "OAuth "+accessToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		var httpError struct {
+			Msg string `json:"message"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&httpError); err != nil {
+			return err
+		}
+		return fmt.Errorf(httpError.Msg)
+	}
+
+	return nil
 }
