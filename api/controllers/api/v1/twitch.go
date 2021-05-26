@@ -94,7 +94,7 @@ func TwitchCallback(c *gin.Context) {
 	}
 
 	tokenStore := jwt.Get()
-	if err := tokenStore.Add(tokens.TokenId, foundUser.ID.String(), tokens.RefreshTokenExp); err != nil {
+	if err := tokenStore.Set(foundUser.ID.String(), tokens.TokenId, tokens.RefreshTokenExp); err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}

@@ -13,8 +13,8 @@ var TokenStore JWTStore
 
 // Client interface for storing, checking, and deleting tokenId from a store
 type JWTStore interface {
-	Add(tokenId string, userId string, exp time.Time) error
-	Exists(tokenId string) error
+	Set(userId, tokenId string, exp time.Time) error
+	Exists(userId, tokenId string) (bool, error)
 	Delete(tokenId string) error
 }
 
@@ -41,13 +41,17 @@ func Get() JWTStore {
 }
 
 // Check if the tokenId exists in the store
-func (r *RedisStore) Add(tokenId, userId string, exp time.Time) error {
-	return r.redis.Set(context.Background(), tokenId, userId, time.Until(exp)).Err()
+func (r *RedisStore) Set(userId, tokenId string, exp time.Time) error {
+	return r.redis.Set(context.Background(), userId, tokenId, time.Until(exp)).Err()
 }
 
 // Check if the tokenId exists in the store
-func (r *RedisStore) Exists(tokenId string) error {
-	return r.redis.Get(context.Background(), tokenId).Err()
+func (r *RedisStore) Exists(userId, tokenId string) (bool, error) {
+	res := r.redis.Get(context.Background(), userId)
+	if res.Err() != nil {
+		return false, res.Err()
+	}
+	return res.Val() == tokenId, nil
 }
 
 // Delete the tokenId from the store

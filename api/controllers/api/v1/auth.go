@@ -45,8 +45,24 @@ func Refresh(c *gin.Context) {
 
 	userId := token.Subject()
 
+	tokenStore := jwt.Get()
+	ok, err := tokenStore.Exists(userId, token.JwtID())
+	if err != nil {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
+	if !ok {
+		c.Errors = append(c.Errors, errors.NewUnauthorizedError(fmt.Errorf("invalidated refresh token")))
+		return
+	}
+
 	tokens, err := jwt.NewTokens(userId)
 	if err != nil {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
+
+	if err := tokenStore.Set(userId, tokens.TokenId, tokens.RefreshTokenExp); err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
