@@ -4,6 +4,7 @@ import (
 	"agones-minecraft/config"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -38,6 +39,8 @@ type UserInfo struct {
 	Picture  string `json:"picture"`
 	Username string `json:"preferred_username"`
 }
+
+var ErrInvalidAccessToken error = errors.New("account invalidated with Twitch")
 
 var TwitchOIDCProvider *oidc.Provider
 
@@ -168,7 +171,10 @@ func ValidateToken(accessToken string) error {
 		if err := json.NewDecoder(res.Body).Decode(&httpError); err != nil {
 			return err
 		}
-		return fmt.Errorf(httpError.Msg)
+		if httpError.Msg == "invalid access token" {
+			return ErrInvalidAccessToken
+		}
+		return errors.New(httpError.Msg)
 	}
 
 	return nil

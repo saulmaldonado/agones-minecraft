@@ -30,15 +30,19 @@ func GetMe(c *gin.Context) {
 	accessToken := user.TwitchAccessToken
 
 	if err := twitch.ValidateToken(*accessToken); err != nil {
-		c.Errors = append(c.Errors, errors.NewNotFoundError(err))
-		zap.L().Warn("error validating user with Twitch", zap.Error(err))
+		if err == twitch.ErrInvalidAccessToken {
+			c.Errors = append(c.Errors, errors.NewNotFoundError(err))
+		} else {
+			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			zap.L().Warn("error validating user with Twitch", zap.Error(err))
+		}
 		return
 	}
 
 	foundUser := userv1Resource.User{
 		ID:             user.ID,
-		Email:          user.Email,
-		TwitchUsername: &user.TwitchUsername,
+		Email:          *user.Email,
+		TwitchUsername: user.TwitchUsername,
 		CreatedAt:      user.CreatedAt,
 		UpdatedAt:      user.UpdatedAt,
 	}
