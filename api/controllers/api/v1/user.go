@@ -42,7 +42,11 @@ func GetMe(c *gin.Context) {
 	foundUser := userv1Resource.User{
 		ID:             user.ID,
 		Email:          *user.Email,
+		EmailVerified:  *user.EmailVerified,
+		TwitchID:       user.TwitchID,
 		TwitchUsername: user.TwitchUsername,
+		MCUsername:     user.MCUsername,
+		MCUUID:         user.MCUUID,
 		CreatedAt:      user.CreatedAt,
 		UpdatedAt:      user.UpdatedAt,
 	}
