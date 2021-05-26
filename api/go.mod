@@ -6,7 +6,7 @@ require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-gonic/gin v1.7.2
-	github.com/go-playground/validator/v10 v10.6.1 // indirect
+	github.com/go-playground/validator/v10 v10.6.1
 	github.com/go-redis/redis/v8 v8.8.3
 	github.com/goccy/go-json v0.5.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

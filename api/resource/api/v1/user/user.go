@@ -17,3 +17,7 @@ type User struct {
 	CreatedAt      time.Time  `json:"createdAt"`
 	UpdatedAt      time.Time  `json:"updatedAt"`
 }
+
+type EditUserBody struct {
+	MCUsername string `json:"mcUsername" binding:"required,mcusername"`
+}

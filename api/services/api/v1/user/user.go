@@ -40,3 +40,7 @@ func CreateUser(user *models.User) error {
 	}
 	return nil
 }
+
+func EditUser(user *models.User) error {
+	return db.DB().Model(user).Updates(user).First(user).Error
+}

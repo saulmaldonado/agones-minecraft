@@ -8,6 +8,7 @@ import (
 	"agones-minecraft/services/auth/jwt"
 	"agones-minecraft/services/auth/sessions"
 	"agones-minecraft/services/auth/twitch"
+	"agones-minecraft/services/validator"
 )
 
 func main() {
@@ -19,6 +20,8 @@ func main() {
 
 	twitch.NewODICProvider()
 	jwt.New()
+	validator.InitV1()
+
 	r := routers.NewRouter()
 
 	port := config.GetPort()

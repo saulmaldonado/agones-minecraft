@@ -54,6 +54,7 @@ func NewRouter() *gin.Engine {
 		{
 			user.Use(jwt.Authorizer())
 			user.GET("/me", v1Controllers.GetMe)
+			user.POST("/me", v1Controllers.EditMe)
 		}
 	}
 	return engine
