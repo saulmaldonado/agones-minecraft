@@ -40,7 +40,7 @@ func Init() {
 		zap.L().Fatal("error connecting to db", zap.Error(err))
 	}
 
-	if err = db.AutoMigrate(&models.User{}); err != nil {
+	if err = db.AutoMigrate(&models.User{}, &models.TwitchToken{}); err != nil {
 		zap.L().Fatal("error auto-migrating db", zap.Error(err))
 	}
 

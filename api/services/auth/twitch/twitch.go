@@ -41,6 +41,7 @@ type UserInfo struct {
 }
 
 var ErrInvalidAccessToken error = errors.New("account invalidated with Twitch")
+var ErrInvalidatedTokens error = errors.New("account credentials invalidated with Twitch")
 
 var TwitchOIDCProvider *oidc.Provider
 
@@ -178,4 +179,41 @@ func ValidateToken(accessToken string) error {
 	}
 
 	return nil
+}
+
+func Refresh(refreshToken, clientId, clientSecret string) (*oauth2.Token, error) {
+	config := NewTwitchConfig(TwitchOIDCProvider)
+	endpoint := config.Endpoint.TokenURL
+
+	req, err := http.NewRequest("POST", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	que := req.URL.Query()
+	que.Add("grant_type", "refresh_token")
+	que.Add("refresh_token", refreshToken)
+	que.Add("client_id", clientId)
+	que.Add("client_secret", clientSecret)
+
+	req.URL.RawQuery = que.Encode()
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode == 401 || res.StatusCode == 400 {
+		return nil, ErrInvalidatedTokens
+	}
+
+	var tokens oauth2.Token
+
+	if err := json.NewDecoder(res.Body).Decode(&tokens); err != nil {
+		return nil, err
+	}
+
+	return &tokens, nil
 }

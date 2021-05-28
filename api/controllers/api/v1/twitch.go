@@ -7,7 +7,6 @@ import (
 
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
 	"agones-minecraft/models"
@@ -64,28 +63,35 @@ func TwitchCallback(c *gin.Context) {
 		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("twitch email not verified")))
 	}
 
-	var user models.User
 	var statusCode int = http.StatusOK
+	user := models.User{
+		Email:          &payload.Email,
+		EmailVerified:  &payload.EmailVerified,
+		TwitchID:       &payload.Sub,
+		TwitchUsername: &payload.Username,
+		TwitchToken: models.TwitchToken{
+			TwitchAccessToken:  &token.AccessToken,
+			TwitchRefreshToken: &token.RefreshToken,
+		},
+	}
 
-	if err := userv1.GetUserByTwitchId(payload.Sub, &user); err != nil {
-		user.Email = &payload.Email
-		user.EmailVerified = &payload.EmailVerified
-		user.TwitchID = &payload.Sub
-		user.TwitchUsername = &payload.Username
-		user.TwitchAccessToken = &token.AccessToken
-		user.TwitchRefreshToken = &token.RefreshToken
-
-		if err := userv1.CreateUser(&user); err != nil {
-			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-			return
-		}
-		statusCode = http.StatusCreated
-		zap.L().Info(
-			"new user created",
-			zap.String("id", user.ID.String()),
-			zap.String("email", *user.Email),
-			zap.String("username", *user.TwitchUsername),
-		)
+	if err := userv1.UpdateUserByTwitchId(&user); err != nil {
+		// if err == gorm.ErrRecordNotFound {
+		// 	if err := userv1.CreateUser(&user); err != nil {
+		// 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		// 		return
+		// 	}
+		// 	statusCode = http.StatusCreated
+		// 	zap.L().Info(
+		// 		"new user created",
+		// 		zap.String("id", user.ID.String()),
+		// 		zap.String("email", *user.Email),
+		// 		zap.String("username", *user.TwitchUsername),
+		// 	)
+		// } else {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+		// }
 	}
 
 	foundUser := userv1Resource.User{

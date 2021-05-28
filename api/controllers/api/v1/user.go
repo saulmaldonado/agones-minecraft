@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	"agones-minecraft/config"
 	"agones-minecraft/middleware/jwt"
 	"agones-minecraft/models"
 	"agones-minecraft/resource/api/v1/errors"
@@ -30,17 +31,44 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
-	accessToken := user.TwitchAccessToken
+	accessToken := user.TwitchToken.TwitchAccessToken
 
 	if err := twitch.ValidateToken(*accessToken); err != nil {
 		if err == twitch.ErrInvalidAccessToken {
-			c.Errors = append(c.Errors, errors.NewNotFoundError(err))
+			zap.L().Info("invalid Twitch access token", zap.String("user", user.ID.String()))
+			clientId, clientSecret, _ := config.GetTwichCreds()
+			token, err := twitch.Refresh(*user.TwitchToken.TwitchRefreshToken, clientId, clientSecret)
+
+			if err != nil {
+				if err == twitch.ErrInvalidatedTokens {
+					c.Errors = append(c.Errors, errors.NewUnauthorizedError(err))
+				} else {
+					c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+				}
+				return
+			}
+
+			user = models.User{
+				ID: uuid.MustParse(userId),
+				TwitchToken: models.TwitchToken{
+					TwitchAccessToken:  &token.AccessToken,
+					TwitchRefreshToken: &token.RefreshToken,
+				},
+			}
+
+			if err := userv1Service.EditUser(&user); err != nil {
+				c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+				return
+			}
+			zap.L().Info("refreshed Twitch access and refresh token", zap.String("user", user.ID.String()))
 		} else {
 			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 			zap.L().Warn("error validating user with Twitch", zap.Error(err))
+			return
 		}
-		return
 	}
+
+	fmt.Println(user)
 
 	foundUser := userv1Resource.User{
 		ID:             user.ID,
