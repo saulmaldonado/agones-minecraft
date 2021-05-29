@@ -27,11 +27,18 @@ func UpsertUserByTwitchId(user *models.User) error {
 			return tx.Create(user).Error
 		}
 
-		if *user.Email != *foundUser.Email || *user.TwitchUsername != *foundUser.TwitchUsername {
+		if *user.Email != *foundUser.Email ||
+			*user.TwitchUsername != *foundUser.TwitchUsername ||
+			*user.TwitchPicture != *foundUser.TwitchPicture {
 			if err := tx.Model(&foundUser).Omit(clause.Associations).Updates(user).Error; err != nil {
 				return err
 			}
+		} else {
+			if err := tx.Model(&foundUser).Select("last_login").Omit("updated_at").Updates(user).Error; err != nil {
+				return err
+			}
 		}
+
 		err = tx.Model(&foundUser.TwitchToken).Updates(&user.TwitchToken).Error
 		*user = foundUser
 		return err

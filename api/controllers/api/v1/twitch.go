@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"
@@ -69,10 +70,12 @@ func TwitchCallback(c *gin.Context) {
 		EmailVerified:  &payload.EmailVerified,
 		TwitchID:       &payload.Sub,
 		TwitchUsername: &payload.Username,
+		TwitchPicture:  &payload.Picture,
 		TwitchToken: models.TwitchToken{
 			TwitchAccessToken:  &token.AccessToken,
 			TwitchRefreshToken: &token.RefreshToken,
 		},
+		LastLogin: time.Now(),
 	}
 
 	if err := userv1.UpsertUserByTwitchId(&user); err != nil {
