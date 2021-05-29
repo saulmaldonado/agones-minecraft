@@ -4,10 +4,10 @@ import (
 	"agones-minecraft/db"
 	"agones-minecraft/models"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func GetUserByEmail(email string, user *models.User) error {
@@ -18,22 +18,23 @@ func GetUserByTwitchId(user *models.User) error {
 	return db.DB().Where("twitch_id = ?", user.TwitchID).Joins("TwitchToken").First(user).Error
 }
 
-func UpdateUserByTwitchId(user *models.User) error {
+func UpsertUserByTwitchId(user *models.User) error {
 	return db.DB().Transaction(func(tx *gorm.DB) error {
-		tx = tx.Session(&gorm.Session{SkipHooks: true})
-		err := tx.First(user, "twitch_id = ?", user.TwitchID).Error
+		var foundUser models.User
+		err := tx.Joins("TwitchToken").First(&foundUser, "twitch_id = ?", user.TwitchID).Error
+
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			user.ID = uuid.New()
-			user.TwitchToken.ID = uuid.New()
-			tx.Create(user)
-		} else {
-			now := time.Now()
-			user.UpdatedAt = now
-			user.TwitchToken.UpdatedAt = now
-			tx.Model(user).Select("updated_at", "email", "email_verified", "twitch_username").Updates(user)
-			tx.Model(&user.TwitchToken).Where("user_id = ?", user.ID).Select("updated_at", "twitch_access_token", "twitch_refresh_token").Updates(&user.TwitchToken)
+			return tx.Create(user).Error
 		}
-		return nil
+
+		if *user.Email != *foundUser.Email || *user.TwitchUsername != *foundUser.TwitchUsername {
+			if err := tx.Model(&foundUser).Omit(clause.Associations).Updates(user).Error; err != nil {
+				return err
+			}
+		}
+		err = tx.Model(&foundUser.TwitchToken).Updates(&user.TwitchToken).Error
+		*user = foundUser
+		return err
 	})
 }
 

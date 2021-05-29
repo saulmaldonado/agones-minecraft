@@ -75,23 +75,9 @@ func TwitchCallback(c *gin.Context) {
 		},
 	}
 
-	if err := userv1.UpdateUserByTwitchId(&user); err != nil {
-		// if err == gorm.ErrRecordNotFound {
-		// 	if err := userv1.CreateUser(&user); err != nil {
-		// 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		// 		return
-		// 	}
-		// 	statusCode = http.StatusCreated
-		// 	zap.L().Info(
-		// 		"new user created",
-		// 		zap.String("id", user.ID.String()),
-		// 		zap.String("email", *user.Email),
-		// 		zap.String("username", *user.TwitchUsername),
-		// 	)
-		// } else {
+	if err := userv1.UpsertUserByTwitchId(&user); err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
-		// }
 	}
 
 	foundUser := userv1Resource.User{
