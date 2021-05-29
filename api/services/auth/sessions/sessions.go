@@ -51,10 +51,7 @@ func AddStateFlash(c *gin.Context, state string) error {
 
 	sess.AddFlash(state, StateCallbackKey)
 
-	if err := sess.Save(); err != nil {
-		return err
-	}
-	return nil
+	return sess.Save()
 }
 
 func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
@@ -66,16 +63,15 @@ func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
 	}
 
 	if state == "" {
-		return false, fmt.Errorf("missing state")
+		return false, fmt.Errorf("missing state. try logging in again")
 	}
 
 	if len(stateChallenge) < 1 {
-		return false, fmt.Errorf("missing state challenge")
+		return false, fmt.Errorf("missing state challenge. try logging in again")
 	}
 
 	if state != stateChallenge[0] {
-		sess.Clear()
-		return false, nil
+		return false, fmt.Errorf("failed state challenge. try logging in again")
 	}
 
 	return true, nil
@@ -84,8 +80,5 @@ func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
 func AddToken(c *gin.Context, tk *oauth2.Token) error {
 	sess := sessions.Default(c)
 	sess.Set(TokenKey, tk)
-	if err := sess.Save(); err != nil {
-		return err
-	}
-	return nil
+	return sess.Save()
 }
