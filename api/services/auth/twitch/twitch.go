@@ -17,6 +17,7 @@ const (
 	oidcIssuer       = "https://id.twitch.tv/oauth2"
 	userInfoEndpoint = "https://id.twitch.tv/oauth2/userinfo"
 	validateEndpoint = "https://id.twitch.tv/oauth2/validate"
+	revokeEndpoint   = "https://id.twitch.tv/oauth2/revoke"
 )
 
 type Payload struct {
@@ -216,4 +217,64 @@ func Refresh(refreshToken, clientId, clientSecret string) (*oauth2.Token, error)
 	}
 
 	return &tokens, nil
+}
+
+// Revokes old access and refresh tokens provided by Twitch
+func RevokeTokens(accessToken, refreshToken, clientId string) []error {
+	var errors []error
+	accessTokenReq, err := http.NewRequest("POST", revokeEndpoint, nil)
+	if err != nil {
+		return []error{err}
+	}
+
+	refreshTokenReq := accessTokenReq.Clone(context.Background())
+
+	aQ := accessTokenReq.URL.Query()
+	rQ := refreshTokenReq.URL.Query()
+	aQ.Add("client_id", clientId)
+	rQ.Add("client_id", clientId)
+	aQ.Add("token", refreshToken)
+	rQ.Add("token", refreshToken)
+
+	accessTokenReq.URL.RawQuery = aQ.Encode()
+	refreshTokenReq.URL.RawQuery = rQ.Encode()
+
+	res, err := http.DefaultClient.Do(accessTokenReq)
+	if err != nil {
+		return []error{err}
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode == 400 {
+		var body struct {
+			Message string
+		}
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+			return []error{err}
+		}
+		if body.Message != "Invalid token" {
+			errors = append(errors, fmt.Errorf("error invalidating access token. message: %s", body.Message))
+		}
+	}
+
+	res, err = http.DefaultClient.Do(refreshTokenReq)
+	if err != nil {
+		return []error{err}
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode == 400 {
+		var body struct {
+			Message string
+		}
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+			return []error{err}
+		}
+		if body.Message != "Invalid token" {
+			errors = append(errors, fmt.Errorf("error invalidating access token. message: %s", body.Message))
+		}
+	}
+	return errors
 }

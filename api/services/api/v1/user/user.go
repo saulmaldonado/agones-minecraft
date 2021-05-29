@@ -1,13 +1,14 @@
 package user
 
 import (
-	"agones-minecraft/db"
-	"agones-minecraft/models"
 	"errors"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"agones-minecraft/db"
+	"agones-minecraft/models"
 )
 
 func GetUserByEmail(email string, user *models.User) error {
@@ -18,8 +19,9 @@ func GetUserByTwitchId(user *models.User) error {
 	return db.DB().Where("twitch_id = ?", user.TwitchID).Joins("TwitchToken").First(user).Error
 }
 
-func UpsertUserByTwitchId(user *models.User) error {
+func UpsertUserByTwitchId(user *models.User, oldTokens chan string) error {
 	return db.DB().Transaction(func(tx *gorm.DB) error {
+		defer close(oldTokens)
 		var foundUser models.User
 		err := tx.Joins("TwitchToken").First(&foundUser, "twitch_id = ?", user.TwitchID).Error
 
@@ -28,6 +30,9 @@ func UpsertUserByTwitchId(user *models.User) error {
 		} else if err != nil {
 			return err
 		}
+
+		oldTokens <- *user.TwitchToken.TwitchAccessToken
+		oldTokens <- *user.TwitchToken.TwitchRefreshToken
 
 		if *user.Email != *foundUser.Email ||
 			*user.TwitchUsername != *foundUser.TwitchUsername ||
