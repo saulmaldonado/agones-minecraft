@@ -64,6 +64,7 @@ func TwitchCallback(c *gin.Context) {
 
 	if !payload.EmailVerified {
 		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("twitch email not verified")))
+		return
 	}
 
 	var statusCode int = http.StatusOK
