@@ -25,6 +25,8 @@ func UpsertUserByTwitchId(user *models.User) error {
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return tx.Create(user).Error
+		} else if err != nil {
+			return err
 		}
 
 		if *user.Email != *foundUser.Email ||
