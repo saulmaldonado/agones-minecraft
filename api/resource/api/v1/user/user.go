@@ -12,8 +12,10 @@ type User struct {
 	EmailVerified  bool       `json:"emailVerified"`
 	TwitchUsername *string    `json:"twitchUsername"`
 	TwitchID       *string    `json:"twitchId"`
+	TwitchPicture  *string    `json:"twitchPicture"`
 	MCUsername     *string    `json:"mcUsername"`
 	MCUUID         *uuid.UUID `json:"mcUuid"`
+	LastLogin      time.Time  `json:"lastLogin"`
 	CreatedAt      time.Time  `json:"createdAt"`
 	UpdatedAt      time.Time  `json:"updatedAt"`
 }

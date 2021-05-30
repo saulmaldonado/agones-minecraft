@@ -41,8 +41,8 @@ type UserInfo struct {
 	Username string `json:"preferred_username"`
 }
 
-var ErrInvalidAccessToken error = errors.New("account invalidated with Twitch")
-var ErrInvalidatedTokens error = errors.New("account credentials invalidated with Twitch")
+var ErrInvalidAccessToken error = errors.New("invalid twitch access token for user")
+var ErrInvalidatedTokens error = errors.New("twitch credentials are invalid. login again to renew credentials and tokens")
 
 var TwitchOIDCProvider *oidc.Provider
 
@@ -221,6 +221,9 @@ func Refresh(refreshToken, clientId, clientSecret string) (*oauth2.Token, error)
 
 // Revokes old access and refresh tokens provided by Twitch
 func RevokeTokens(accessToken, refreshToken, clientId string) []error {
+	if accessToken == "" && refreshToken == "" {
+		return nil
+	}
 	var errors []error
 	accessTokenReq, err := http.NewRequest("POST", revokeEndpoint, nil)
 	if err != nil {

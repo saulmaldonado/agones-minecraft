@@ -13,6 +13,7 @@ import (
 	"agones-minecraft/middleware/jwt"
 	ginzap "agones-minecraft/middleware/log"
 	"agones-minecraft/middleware/session"
+	twitchMiddleware "agones-minecraft/middleware/twitch"
 )
 
 func NewRouter() *gin.Engine {
@@ -53,6 +54,7 @@ func NewRouter() *gin.Engine {
 		user := v1.Group("/user")
 		{
 			user.Use(jwt.Authorizer())
+			user.Use(twitchMiddleware.Authorizer())
 			user.GET("/me", v1Controllers.GetMe)
 			user.POST("/me", v1Controllers.EditMe)
 		}

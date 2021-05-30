@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc"
@@ -82,8 +81,7 @@ func TwitchCallback(c *gin.Context) {
 	}
 
 	oldTokens := make(chan string, 2)
-	var wg sync.WaitGroup
-	go revokeOldTokens(config.ClientID, &wg, oldTokens)
+	go revokeOldTokens(config.ClientID, oldTokens)
 
 	if err := userv1.UpsertUserByTwitchId(&user, oldTokens); err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
@@ -96,6 +94,8 @@ func TwitchCallback(c *gin.Context) {
 		EmailVerified:  *user.EmailVerified,
 		TwitchID:       user.TwitchID,
 		TwitchUsername: user.TwitchUsername,
+		TwitchPicture:  user.TwitchPicture,
+		LastLogin:      user.LastLogin,
 		CreatedAt:      user.CreatedAt,
 		UpdatedAt:      user.UpdatedAt,
 	}
@@ -116,15 +116,10 @@ func TwitchCallback(c *gin.Context) {
 		"tokens": tokens,
 		"user":   foundUser,
 	})
-
-	// wait for token revocation
-	wg.Wait()
 }
 
 // Helper func to revoke old tokens and log errors in a goroutine
-func revokeOldTokens(clientId string, wg *sync.WaitGroup, oldTokens chan string) {
-	wg.Add(1)
-	defer wg.Done()
+func revokeOldTokens(clientId string, oldTokens chan string) {
 	errs := twitch.RevokeTokens(<-oldTokens, <-oldTokens, clientId)
 	for _, e := range errs {
 		zap.L().Warn("error invalidating old tokens", zap.Error(e))
