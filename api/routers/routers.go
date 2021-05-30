@@ -49,6 +49,8 @@ func NewRouter() *gin.Engine {
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/refresh", v1Controllers.Refresh)
+			auth.Use(jwt.Authorizer())
+			auth.POST("/logout", v1Controllers.Logout)
 		}
 
 		user := v1.Group("/user")

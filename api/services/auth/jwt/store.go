@@ -55,6 +55,6 @@ func (r *RedisStore) Exists(userId, tokenId string) (bool, error) {
 }
 
 // Delete the tokenId from the store
-func (r *RedisStore) Delete(tokenId string) error {
-	return r.redis.Del(context.Background(), tokenId).Err()
+func (r *RedisStore) Delete(userId string) error {
+	return r.redis.Del(context.Background(), userId).Err()
 }

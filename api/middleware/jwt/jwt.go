@@ -12,6 +12,7 @@ import (
 const (
 	HeaderKey  string = "Authorization"
 	ContextKey string = "JWT_SUBJECT"
+	TokenIDKey string = "JWT_ID"
 )
 
 // returns middleware that will parse JWT token in Authorization header, validate it, verify it
@@ -56,6 +57,7 @@ func Authorizer() gin.HandlerFunc {
 
 		// Set userId for request context
 		c.Set(ContextKey, token.Subject())
+		c.Set(TokenIDKey, token.JwtID())
 
 		c.Next()
 	}

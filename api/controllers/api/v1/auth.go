@@ -1,12 +1,22 @@
 package v1Controllers
 
 import (
-	"agones-minecraft/resource/api/v1/errors"
-	"agones-minecraft/services/auth/jwt"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+
+	"agones-minecraft/config"
+	jwtmiddleware "agones-minecraft/middleware/jwt"
+	"agones-minecraft/middleware/twitch"
+	"agones-minecraft/models"
+	"agones-minecraft/resource/api/v1/errors"
+	userv1Service "agones-minecraft/services/api/v1/user"
+	"agones-minecraft/services/auth/jwt"
+	twitchauth "agones-minecraft/services/auth/twitch"
 )
 
 type VerifyBody struct {
@@ -70,4 +80,39 @@ func Refresh(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"tokens": tokens,
 	})
+}
+
+func Logout(c *gin.Context) {
+	userId := c.GetString(twitch.SubjectKey)
+	tokenId := c.GetString(jwtmiddleware.TokenIDKey)
+
+	tokenStore := jwt.Get()
+
+	if ok, _ := tokenStore.Exists(userId, tokenId); ok {
+		if err := tokenStore.Delete(userId); err != nil {
+			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			return
+		}
+	}
+
+	err := func() error {
+		var twitchTokens models.TwitchToken
+		if err := userv1Service.GetUserTwitchTokens(uuid.MustParse(userId), &twitchTokens); err != nil {
+			return err
+		}
+
+		clientId, _, _ := config.GetTwichCreds()
+		errs := twitchauth.RevokeTokens(*twitchTokens.TwitchAccessToken, *twitchTokens.TwitchRefreshToken, clientId)
+		for _, e := range errs {
+			zap.L().Warn("error invalidating old tokens", zap.Error(e))
+		}
+		return nil
+	}()
+
+	if err != nil && err != gorm.ErrRecordNotFound {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
