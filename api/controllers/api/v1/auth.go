@@ -3,6 +3,7 @@ package v1Controllers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,24 +20,26 @@ import (
 	twitchauth "agones-minecraft/services/auth/twitch"
 )
 
-type VerifyBody struct {
-	RefreshToken string `json:"refreshToken"`
-}
-
 func Refresh(c *gin.Context) {
-	var body VerifyBody
-	if err := c.BindJSON(&body); err != nil {
-		c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+	header := c.GetHeader(jwtmiddleware.HeaderKey)
+	tokenString := strings.TrimSpace(strings.TrimPrefix(header, "Bearer"))
+
+	if tokenString == "" {
+		c.Errors = append(c.Errors, errors.NewUnauthorizedError(fmt.Errorf("missing refresh token in Authorization header")))
+		c.Abort()
 		return
 	}
 
-	token, err := jwt.ParseToken(body.RefreshToken)
+	token, err := jwt.ParseToken(tokenString)
 	if err != nil {
 		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("unable to parse token")))
 		return
 	}
 
-	v, _ := token.Get(jwt.RefreshKey)
+	v, ok := token.Get(jwt.RefreshKey)
+	if !ok {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(fmt.Errorf("missing \"refresh\" key from refres token")))
+	}
 
 	if !v.(bool) {
 		c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("token identified as access token")))
@@ -48,7 +51,7 @@ func Refresh(c *gin.Context) {
 		return
 	}
 
-	if err := jwt.VerifyRefreshToken(body.RefreshToken); err != nil {
+	if err := jwt.VerifyRefreshToken(tokenString); err != nil {
 		c.Errors = append(c.Errors, errors.NewUnauthorizedError(fmt.Errorf("unable to verify refresh token")))
 		return
 	}
@@ -56,7 +59,7 @@ func Refresh(c *gin.Context) {
 	userId := token.Subject()
 
 	tokenStore := jwt.Get()
-	ok, err := tokenStore.Exists(userId, token.JwtID())
+	ok, err = tokenStore.Exists(userId, token.JwtID())
 	if err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
