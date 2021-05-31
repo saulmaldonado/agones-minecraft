@@ -8,11 +8,13 @@ import (
 	"agones-minecraft/services/auth/jwt"
 	"agones-minecraft/services/auth/sessions"
 	"agones-minecraft/services/auth/twitch"
+	"agones-minecraft/services/k8s"
 	"agones-minecraft/services/validator"
 )
 
 func main() {
 	config.LoadConfig()
+	k8s.Init()
 	log.SetLog()
 
 	sessions.NewStore()
