@@ -66,7 +66,6 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	var statusCode int = http.StatusOK
 	user := models.User{
 		Email:          &payload.Email,
 		EmailVerified:  &payload.EmailVerified,
@@ -106,13 +105,12 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	tokenStore := jwt.Get()
-	if err := tokenStore.Set(foundUser.ID.String(), tokens.TokenId, tokens.RefreshTokenExp); err != nil {
+	if err := jwt.Get().Set(foundUser.ID.String(), tokens.TokenId, tokens.RefreshTokenExp); err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
-	c.JSON(statusCode, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"tokens": tokens,
 		"user":   foundUser,
 	})

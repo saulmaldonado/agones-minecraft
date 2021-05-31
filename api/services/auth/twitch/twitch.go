@@ -221,30 +221,37 @@ func Refresh(refreshToken, clientId, clientSecret string) (*oauth2.Token, error)
 
 // Revokes old access and refresh tokens provided by Twitch
 func RevokeTokens(accessToken, refreshToken, clientId string) []error {
-	if accessToken == "" && refreshToken == "" {
+	var errors []error
+
+	if err := RevokeToken(accessToken, clientId); err != nil {
+		errors = append(errors, err)
+	}
+	if err := RevokeToken(refreshToken, clientId); err != nil {
+		errors = append(errors, err)
+	}
+
+	return errors
+}
+
+func RevokeToken(token, clientId string) error {
+	if token == "" {
 		return nil
 	}
-	var errors []error
-	accessTokenReq, err := http.NewRequest("POST", revokeEndpoint, nil)
+
+	tokenReq, err := http.NewRequest("POST", revokeEndpoint, nil)
 	if err != nil {
-		return []error{err}
+		return err
 	}
 
-	refreshTokenReq := accessTokenReq.Clone(context.Background())
-
-	aQ := accessTokenReq.URL.Query()
-	rQ := refreshTokenReq.URL.Query()
+	aQ := tokenReq.URL.Query()
 	aQ.Add("client_id", clientId)
-	rQ.Add("client_id", clientId)
-	aQ.Add("token", refreshToken)
-	rQ.Add("token", refreshToken)
+	aQ.Add("token", token)
 
-	accessTokenReq.URL.RawQuery = aQ.Encode()
-	refreshTokenReq.URL.RawQuery = rQ.Encode()
+	tokenReq.URL.RawQuery = aQ.Encode()
 
-	res, err := http.DefaultClient.Do(accessTokenReq)
+	res, err := http.DefaultClient.Do(tokenReq)
 	if err != nil {
-		return []error{err}
+		return err
 	}
 
 	defer res.Body.Close()
@@ -254,30 +261,12 @@ func RevokeTokens(accessToken, refreshToken, clientId string) []error {
 			Message string
 		}
 		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-			return []error{err}
+			return err
 		}
 		if body.Message != "Invalid token" {
-			errors = append(errors, fmt.Errorf("error invalidating access token. message: %s", body.Message))
+			return fmt.Errorf("error invalidating access token. message: %s", body.Message)
 		}
 	}
+	return nil
 
-	res, err = http.DefaultClient.Do(refreshTokenReq)
-	if err != nil {
-		return []error{err}
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode == 400 {
-		var body struct {
-			Message string
-		}
-		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
-			return []error{err}
-		}
-		if body.Message != "Invalid token" {
-			errors = append(errors, fmt.Errorf("error invalidating access token. message: %s", body.Message))
-		}
-	}
-	return errors
 }

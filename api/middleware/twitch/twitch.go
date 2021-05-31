@@ -12,11 +12,13 @@ import (
 	"agones-minecraft/models"
 	"agones-minecraft/resource/api/v1/errors"
 	userv1Service "agones-minecraft/services/api/v1/user"
+	"agones-minecraft/services/auth/jwt"
 	"agones-minecraft/services/auth/twitch"
 )
 
 const (
 	SubjectKey string = "JWT_SUBJECT"
+	TokenIDKey string = "JWT_ID"
 	UserKey    string = "USER"
 )
 
@@ -46,19 +48,17 @@ func Authorizer() gin.HandlerFunc {
 					// Both tokens are invalid. New login is required
 					if err == twitch.ErrInvalidatedTokens {
 						c.Errors = append(c.Errors, errors.NewUnauthorizedError(err))
+						// revoke api tokens to force new login
+						tokenId := c.GetString(TokenIDKey)
+						if err := jwt.Get().Delete(tokenId); err != nil {
+							zap.L().Warn("error revoking app tokens", zap.Error(err))
+						}
 					} else {
 						c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 					}
 					c.Abort()
 					return
 				}
-
-				go func() {
-					errs := twitch.RevokeTokens(*twitchTokens.TwitchAccessToken, *twitchTokens.TwitchRefreshToken, clientId)
-					for _, e := range errs {
-						zap.L().Warn("error invalidating old tokens", zap.Error(e))
-					}
-				}()
 
 				twitchTokens.TwitchAccessToken = &token.AccessToken
 				twitchTokens.TwitchRefreshToken = &token.RefreshToken
