@@ -29,8 +29,17 @@ func GetGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gameServer)
 }
 
-func CreateGame(c *gin.Context) {
+func CreateJava(c *gin.Context) {
 	gameServer, err := agones.Client().Create(agones.NewJavaServer())
+	if err != nil {
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
+	c.JSON(http.StatusCreated, gameServer)
+}
+
+func CreateBedrock(c *gin.Context) {
+	gameServer, err := agones.Client().Create(agones.NewBedrockServer())
 	if err != nil {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return

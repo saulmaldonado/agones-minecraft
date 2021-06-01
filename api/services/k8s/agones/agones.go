@@ -15,11 +15,17 @@ import (
 )
 
 const (
+	// GameServer labels
+
+	JavaEdition    string = "java"
+	BedrockEdition string = "bedrock"
+
 	// GameServer Spec
 
-	DefaultGenerateName                string = "mc-server-"
-	DefaultJavaGameServerContainerName string = "mc-server"
-	DefaultJavaContainerPort           int32  = 25565
+	DefaultGenerateName            string = "mc-server-"
+	DefaultGameServerContainerName string = "mc-server"
+	DefaultJavaContainerPort       int32  = 25565
+	DefaultBedrockContainerPort    int32  = 19132
 
 	// Health
 
@@ -30,6 +36,7 @@ const (
 	// Pod Template
 
 	DefaultJavaImage     string = "itzg/minecraft-server"
+	DefaultBedrockImage  string = "saulmaldonado/minecraft-bedrock-server"
 	DefaultRCONPort      int32  = 25575
 	DefaultRCONPassword  string = "minecraft"
 	DefaultDataDirectory string = "/data"
@@ -116,9 +123,15 @@ func (c *AgonesClient) Delete(serverName string) error {
 // Agones v1 GameServer object
 func NewJavaServer() *agonesv1.GameServer {
 	return &agonesv1.GameServer{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: DefaultGenerateName, Namespace: metav1.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: DefaultGenerateName,
+			Namespace:    metav1.NamespaceDefault,
+			Labels: map[string]string{
+				"edition": JavaEdition,
+			},
+		},
 		Spec: agonesv1.GameServerSpec{
-			Container: DefaultJavaGameServerContainerName,
+			Container: DefaultGameServerContainerName,
 			Ports: []agonesv1.GameServerPort{{
 				ContainerPort: DefaultJavaContainerPort,
 				Name:          "mc",
@@ -134,8 +147,9 @@ func NewJavaServer() *agonesv1.GameServer {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  DefaultJavaGameServerContainerName,
-							Image: DefaultJavaImage,
+							Name:            DefaultGameServerContainerName,
+							Image:           DefaultJavaImage,
+							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{Name: "EULA", Value: "TRUE"},
 							},
@@ -151,7 +165,7 @@ func NewJavaServer() *agonesv1.GameServer {
 							Image: MCMonitorImageName,
 							Args: []string{
 								"monitor",
-								fmt.Sprintf("--attempts=%ds", DefaultFailureThreshold),
+								"--attempts=" + fmt.Sprint(DefaultFailureThreshold),
 								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
 								fmt.Sprintf("--interval=%ds", DefaultPeriodSeconds-2),
 								fmt.Sprintf("--timeout=%ds", DefaultPeriodSeconds-2),
@@ -166,6 +180,105 @@ func NewJavaServer() *agonesv1.GameServer {
 								"--gcp-bucket-name=" + MCBackupDefaultBucketName,
 								"--backup-cron=" + DefaultMCBackupCron,
 								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "NAME", ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								{
+									Name:  "RCON_PASSWORD",
+									Value: DefaultRCONPassword,
+								},
+							},
+							ImagePullPolicy: corev1.PullAlways,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: DefaultDataDirectory,
+									Name:      DefaultDataVolumeName,
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: DefaultDataVolumeName,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func NewBedrockServer() *agonesv1.GameServer {
+	return &agonesv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: DefaultGenerateName,
+			Namespace:    metav1.NamespaceDefault,
+			Labels: map[string]string{
+				"edition": BedrockEdition,
+			},
+		},
+		Spec: agonesv1.GameServerSpec{
+			Container: DefaultGameServerContainerName,
+			Ports: []agonesv1.GameServerPort{{
+				ContainerPort: DefaultBedrockContainerPort,
+				Name:          "mc",
+				PortPolicy:    agonesv1.Dynamic,
+				Protocol:      corev1.ProtocolUDP,
+			}},
+			Health: agonesv1.Health{
+				InitialDelaySeconds: DefaultInitialDelay,
+				PeriodSeconds:       DefaultPeriodSeconds,
+				FailureThreshold:    DefaultFailureThreshold,
+			},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            DefaultGameServerContainerName,
+							Image:           DefaultBedrockImage,
+							ImagePullPolicy: corev1.PullAlways,
+							Env: []corev1.EnvVar{
+								{Name: "EULA", Value: "TRUE"},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: DefaultDataDirectory, Name: DefaultDataVolumeName},
+							},
+							Ports: []corev1.ContainerPort{
+								{ContainerPort: 25575},
+							},
+						},
+						{
+							Name:  "mc-monitor",
+							Image: MCMonitorImageName,
+							Args: []string{
+								"monitor",
+								"--attempts=" + fmt.Sprint(DefaultFailureThreshold),
+								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
+								fmt.Sprintf("--interval=%ds", DefaultPeriodSeconds-2),
+								fmt.Sprintf("--timeout=%ds", DefaultPeriodSeconds-2),
+								"--port=" + fmt.Sprint(DefaultBedrockContainerPort),
+								"--edition=" + BedrockEdition,
+							},
+							ImagePullPolicy: corev1.PullAlways,
+						},
+						{
+							Name:  "mc-backup",
+							Image: MCMonitorImageName,
+							Args: []string{
+								"backup",
+								"--gcp-bucket-name=" + MCBackupDefaultBucketName,
+								"--backup-cron=" + DefaultMCBackupCron,
+								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
+								"--edition=" + BedrockEdition,
 							},
 							Env: []corev1.EnvVar{
 								{
