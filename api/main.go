@@ -9,13 +9,16 @@ import (
 	"agones-minecraft/services/auth/sessions"
 	"agones-minecraft/services/auth/twitch"
 	"agones-minecraft/services/k8s"
+	"agones-minecraft/services/k8s/agones"
 	"agones-minecraft/services/validator"
 )
 
 func main() {
 	config.LoadConfig()
-	k8s.Init()
 	log.SetLog()
+
+	k8s.InitConfig()
+	agones.Init()
 
 	sessions.NewStore()
 	db.Init()

@@ -60,6 +60,12 @@ func NewRouter() *gin.Engine {
 			user.GET("/me", v1Controllers.GetMe)
 			user.POST("/me", v1Controllers.EditMe)
 		}
+
+		game := v1.Group("/game")
+		{
+			game.GET("/list", v1Controllers.ListGames)
+			game.GET("/:name", v1Controllers.GetGame)
+		}
 	}
 	return engine
 }

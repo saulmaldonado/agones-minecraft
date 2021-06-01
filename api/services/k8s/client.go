@@ -2,32 +2,26 @@ package k8s
 
 import (
 	"flag"
-	"log"
 	"path/filepath"
 
-	"agones.dev/agones/pkg/client/clientset/versioned"
-	"k8s.io/client-go/kubernetes"
+	"go.uber.org/zap"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
 
-type AppK8sClient struct {
-	K8s    *kubernetes.Clientset
-	Agones *versioned.Clientset
-}
+var config *rest.Config
 
-var k8sClient *AppK8sClient
-
-func Init() {
-	client, err := New()
+func InitConfig() {
+	cfg, err := NewConfig()
 	if err != nil {
-		log.Fatal(err)
+		zap.L().Fatal("error initializing k8s config", zap.Error(err))
 	}
-	k8sClient = client
+	config = cfg
 }
 
-func New() (*AppK8sClient, error) {
+func NewConfig() (*rest.Config, error) {
 	var kubeconfig *string
 	// kubeconfig path defaults to ~/.kube/config
 	if home := homedir.HomeDir(); home != "" {
@@ -35,29 +29,15 @@ func New() (*AppK8sClient, error) {
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
-
 	flag.Parse()
+
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	agonesClient, err := versioned.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AppK8sClient{
-		K8s:    clientset,
-		Agones: agonesClient,
-	}, nil
+	return config, nil
 }
 
-func Get() *AppK8sClient {
-	return k8sClient
+func GetConfig() *rest.Config {
+	return config
 }
