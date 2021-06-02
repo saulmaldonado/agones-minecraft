@@ -6,10 +6,14 @@ import (
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"agones.dev/agones/pkg/client/clientset/versioned"
+	v1Informers "agones.dev/agones/pkg/client/informers/externalversions/agones/v1"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	k8s "agones-minecraft/services/k8s"
 )
@@ -61,6 +65,7 @@ var agonesClient *AgonesClient
 // Agones clientset wrapper
 type AgonesClient struct {
 	clientSet *versioned.Clientset
+	informer  v1Informers.GameServerInformer
 }
 
 // Initializes Agones client
@@ -69,6 +74,8 @@ func Init() {
 	if err != nil {
 		zap.L().Fatal("error initializing agones client", zap.Error(err))
 	}
+	go c.informer.Informer().Run(wait.NeverStop)
+	cache.WaitForCacheSync(wait.NeverStop, c.informer.Informer().HasSynced)
 	agonesClient = c
 }
 
@@ -80,27 +87,31 @@ func Client() *AgonesClient {
 // Creates new Agones client
 func New(config *rest.Config) (*AgonesClient, error) {
 	agonesClient, err := versioned.NewForConfig(config)
+	gameServerInformer := NewGameServerInformer(agonesClient)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AgonesClient{agonesClient}, nil
+	return &AgonesClient{agonesClient, gameServerInformer}, nil
 }
 
 // Gets a GameServer by name
 func (c *AgonesClient) Get(serverName string) (*agonesv1.GameServer, error) {
-	return c.clientSet.
-		AgonesV1().
-		GameServers(metav1.NamespaceDefault).
-		Get(context.Background(), serverName, metav1.GetOptions{})
+	return c.informer.Lister().GameServers(metav1.NamespaceDefault).Get(serverName)
+
+	// return c.clientSet.
+	// 	AgonesV1().
+	// 	GameServers(metav1.NamespaceDefault).
+	// 	Get(context.Background(), serverName, metav1.GetOptions{})
 }
 
 // Gets all GameServers for default namespace
-func (c *AgonesClient) List() (*agonesv1.GameServerList, error) {
-	return c.clientSet.
-		AgonesV1().
-		GameServers(metav1.NamespaceDefault).
-		List(context.Background(), metav1.ListOptions{})
+func (c *AgonesClient) List() ([]*agonesv1.GameServer, error) {
+	return c.informer.Lister().GameServers(metav1.NamespaceDefault).List(labels.Everything())
+	// return c.clientSet.
+	// 	AgonesV1().
+	// 	GameServers(metav1.NamespaceDefault).
+	// 	List(context.Background(), metav1.ListOptions{})
 }
 
 // Creates a new GameServer

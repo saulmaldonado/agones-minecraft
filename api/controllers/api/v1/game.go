@@ -16,7 +16,7 @@ func ListGames(c *gin.Context) {
 		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
-	c.JSON(http.StatusOK, gameServers.Items)
+	c.JSON(http.StatusOK, gameServers)
 }
 
 func GetGame(c *gin.Context) {
