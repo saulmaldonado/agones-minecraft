@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"go.uber.org/zap"
 )
 
 // Global JWTStore
@@ -16,11 +17,20 @@ type JWTStore interface {
 	Set(userId, tokenId string, exp time.Time) error
 	Exists(userId, tokenId string) (bool, error)
 	Delete(tokenId string) error
+	Ping() error
 }
 
 // Redis JWTStore implentation.
 type RedisStore struct {
 	redis *redis.Client
+}
+
+func Init() {
+	TokenStore = New()
+	if err := TokenStore.Ping(); err != nil {
+		// warn if ping fails
+		zap.L().Warn(err.Error())
+	}
 }
 
 // Creates and returns a new JWT store client
@@ -30,8 +40,7 @@ func New() JWTStore {
 		Addr:     addr,
 		Password: pass,
 	})
-	TokenStore = &RedisStore{client}
-	return TokenStore
+	return &RedisStore{client}
 }
 
 // Returns the existing JWT store client
@@ -57,4 +66,8 @@ func (r *RedisStore) Exists(userId, tokenId string) (bool, error) {
 // Delete the tokenId from the store
 func (r *RedisStore) Delete(userId string) error {
 	return r.redis.Del(context.Background(), userId).Err()
+}
+
+func (r *RedisStore) Ping() error {
+	return r.redis.Ping(context.Background()).Err()
 }

@@ -57,6 +57,10 @@ func NewTwitchConfig(provider *oidc.Provider, scopes ...string) *oauth2.Config {
 	}
 }
 
+func Init() {
+	TwitchOIDCProvider = NewODICProvider()
+}
+
 func NewODICProvider() *oidc.Provider {
 	if TwitchOIDCProvider != nil {
 		return TwitchOIDCProvider
@@ -65,7 +69,6 @@ func NewODICProvider() *oidc.Provider {
 	if err != nil {
 		log.Fatal(err)
 	}
-	TwitchOIDCProvider = prov
 	return prov
 }
 

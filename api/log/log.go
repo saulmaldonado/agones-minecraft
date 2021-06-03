@@ -8,7 +8,7 @@ import (
 )
 
 // Sets global zap logger
-func SetLog() {
+func Init() {
 	var logger *zap.Logger
 	var err error
 

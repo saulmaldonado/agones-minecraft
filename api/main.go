@@ -14,17 +14,23 @@ import (
 )
 
 func main() {
+	// Load environment variables and .env config
 	config.LoadConfig()
-	log.SetLog()
-
+	// Sets global zap logger
+	log.Init()
+	// Initializes k8s cluster config
 	k8s.InitConfig()
+	// Initializes agones client and informer
 	agones.Init()
-
-	sessions.NewStore()
+	// Initializes cookie store
+	sessions.Init()
+	// Initializes database connections and migrates (in development)
 	db.Init()
-
-	twitch.NewODICProvider()
-	jwt.New()
+	// Initializes Twitch ODIC provider for login with Twitch
+	twitch.Init()
+	// Initializes JWT token store
+	jwt.Init()
+	// Initializes custom validators
 	validator.InitV1()
 
 	r := routers.NewRouter()

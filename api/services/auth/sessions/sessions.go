@@ -2,7 +2,6 @@ package sessions
 
 import (
 	"crypto/rand"
-	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 
@@ -23,11 +22,13 @@ const (
 
 var Store cookie.Store
 
+func Init() {
+	Store = NewStore()
+}
+
 func NewStore() cookie.Store {
-	gob.Register(oauth2.Token{})
 	authKey, encKey := config.GetSessionSecret()
-	Store = cookie.NewStore(authKey, encKey)
-	return Store
+	return cookie.NewStore(authKey, encKey)
 }
 
 func GetStore() cookie.Store {
