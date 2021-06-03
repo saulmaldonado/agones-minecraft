@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"agones-minecraft/config"
 	k8s "agones-minecraft/services/k8s"
 )
 
@@ -58,14 +59,26 @@ const (
 	// volumes
 
 	DefaultDataVolumeName string = "world-vol"
+
+	// annotations
+
+	HostnameAnnotation        string = "external-dns.alpha.kubernetes.io/hostname"
+	SRVServiceAnnotation      string = "external-dns.alpha.kubernetes.io/gameserver-service"
+	JavaSRVServiceName        string = "minecraft"
+	CustomSubdomainAnnotation string = "external-dns.alpha.kubernetes.io/gameserver-subdomain"
+
+	// labels
+
+	EditionLabel string = "edition"
 )
 
 var agonesClient *AgonesClient
 
 // Agones clientset wrapper
 type AgonesClient struct {
-	clientSet *versioned.Clientset
-	informer  v1Informers.GameServerInformer
+	clientSet   *versioned.Clientset
+	informer    v1Informers.GameServerInformer
+	recordStore GameServerDNSRecordStore
 }
 
 // Initializes Agones client
@@ -88,30 +101,22 @@ func Client() *AgonesClient {
 func New(config *rest.Config) (*AgonesClient, error) {
 	agonesClient, err := versioned.NewForConfig(config)
 	gameServerInformer := NewGameServerInformer(agonesClient)
+	recordStore := NewGameServerDNSRecordStore(gameServerInformer)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AgonesClient{agonesClient, gameServerInformer}, nil
+	return &AgonesClient{agonesClient, gameServerInformer, recordStore}, nil
 }
 
 // Gets a GameServer by name
 func (c *AgonesClient) Get(serverName string) (*agonesv1.GameServer, error) {
 	return c.informer.Lister().GameServers(metav1.NamespaceDefault).Get(serverName)
-
-	// return c.clientSet.
-	// 	AgonesV1().
-	// 	GameServers(metav1.NamespaceDefault).
-	// 	Get(context.Background(), serverName, metav1.GetOptions{})
 }
 
 // Gets all GameServers for default namespace
 func (c *AgonesClient) List() ([]*agonesv1.GameServer, error) {
 	return c.informer.Lister().GameServers(metav1.NamespaceDefault).List(labels.Everything())
-	// return c.clientSet.
-	// 	AgonesV1().
-	// 	GameServers(metav1.NamespaceDefault).
-	// 	List(context.Background(), metav1.ListOptions{})
 }
 
 // Creates a new GameServer
@@ -130,6 +135,45 @@ func (c *AgonesClient) Delete(serverName string) error {
 		Delete(context.Background(), serverName, metav1.DeleteOptions{})
 }
 
+func (c *AgonesClient) HostnameAvailable(domain, subdomain string) bool {
+	hostname := fmt.Sprintf("%s.%s", subdomain, domain)
+	_, ok := c.recordStore.Get(hostname)
+	return !ok
+}
+
+func (c *AgonesClient) ListRecords() []string {
+	return c.recordStore.List()
+}
+
+func SetHostname(gs *agonesv1.GameServer, domain, subdomain string) {
+	anno := gs.GetAnnotations()
+	anno[CustomSubdomainAnnotation] = subdomain
+	anno[HostnameAnnotation] = domain
+	gs.SetAnnotations(anno)
+}
+
+func GetDomainName(gs *agonesv1.GameServer) string {
+	return gs.Annotations[HostnameAnnotation]
+}
+
+func GetSubdomain(gs *agonesv1.GameServer) (string, bool) {
+	v, ok := gs.Annotations[CustomSubdomainAnnotation]
+	return v, ok
+}
+
+func GetHostname(gs *agonesv1.GameServer) string {
+	subdomain := gs.Name
+	if domain, ok := gs.Annotations[CustomSubdomainAnnotation]; ok {
+		subdomain = domain
+	}
+	domain := gs.Annotations[HostnameAnnotation]
+	return fmt.Sprintf("%s.%s", subdomain, domain)
+}
+
+func GetDNSZone() string {
+	return config.GetDNSZone()
+}
+
 // Initializes a new default Java Minecraft server
 // Agones v1 GameServer object
 func NewJavaServer() *agonesv1.GameServer {
@@ -137,8 +181,12 @@ func NewJavaServer() *agonesv1.GameServer {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: DefaultGenerateName,
 			Namespace:    metav1.NamespaceDefault,
+			Annotations: map[string]string{
+				HostnameAnnotation:   GetDNSZone(),
+				SRVServiceAnnotation: JavaSRVServiceName,
+			},
 			Labels: map[string]string{
-				"edition": JavaEdition,
+				EditionLabel: JavaEdition,
 			},
 		},
 		Spec: agonesv1.GameServerSpec{
@@ -233,8 +281,12 @@ func NewBedrockServer() *agonesv1.GameServer {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: DefaultGenerateName,
 			Namespace:    metav1.NamespaceDefault,
+			Annotations: map[string]string{
+				HostnameAnnotation:   GetDNSZone(),
+				SRVServiceAnnotation: JavaSRVServiceName,
+			},
 			Labels: map[string]string{
-				"edition": BedrockEdition,
+				EditionLabel: BedrockEdition,
 			},
 		},
 		Spec: agonesv1.GameServerSpec{

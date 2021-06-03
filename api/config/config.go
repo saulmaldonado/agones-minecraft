@@ -21,6 +21,7 @@ const (
 	REDIS_ADDRESS        = "REDIS_ADDRESS"
 	REDIS_PASSWORD       = "REDIS_PASSWORD"
 	JWT_SECRET           = "JWT_SECRET"
+	DNS_ZONE             = "DNS_ZONE"
 
 	Production  = "production"
 	Development = "development"
@@ -80,4 +81,8 @@ func GetJWTSecret() string {
 
 func GetRedisCreds() (address string, password string) {
 	return viper.GetString(REDIS_ADDRESS), viper.GetString(REDIS_PASSWORD)
+}
+
+func GetDNSZone() string {
+	return viper.GetString(DNS_ZONE)
 }
