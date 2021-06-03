@@ -18,6 +18,7 @@ type User struct {
 	TwitchToken    TwitchToken `gorm:"constraint:OnDelete:CASCADE"`
 	MCUsername     *string     `gorm:"size:16"`
 	MCUUID         *uuid.UUID  `gorm:"type:uuid"`
+	Game           []Game
 	LastLogin      time.Time
 }
 
