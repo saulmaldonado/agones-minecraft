@@ -10,7 +10,7 @@ import (
 
 	"agones-minecraft/middleware/jwt"
 	"agones-minecraft/middleware/twitch"
-	"agones-minecraft/models"
+	userv1Model "agones-minecraft/models/v1/user"
 	"agones-minecraft/resource/api/v1/errors"
 	userv1Resource "agones-minecraft/resource/api/v1/user"
 	userv1Service "agones-minecraft/services/api/v1/user"
@@ -25,7 +25,7 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
-	var user models.User
+	var user userv1Model.User
 	userv1Service.GetUserById(uuid.MustParse(userId), &user)
 
 	foundUser := userv1Resource.User{
@@ -64,7 +64,7 @@ func EditMe(c *gin.Context) {
 		return
 	}
 
-	user := models.User{
+	user := userv1Model.User{
 		ID:         uuid.MustParse(userId),
 		MCUsername: &mcUser.Username,
 		MCUUID:     &mcUser.UUID,

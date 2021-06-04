@@ -13,7 +13,7 @@ import (
 	"agones-minecraft/config"
 	jwtmiddleware "agones-minecraft/middleware/jwt"
 	"agones-minecraft/middleware/twitch"
-	"agones-minecraft/models"
+	twitchv1Model "agones-minecraft/models/v1/twitch"
 	"agones-minecraft/resource/api/v1/errors"
 	userv1Service "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/auth/jwt"
@@ -99,7 +99,7 @@ func Logout(c *gin.Context) {
 	}
 
 	err := func() error {
-		var twitchTokens models.TwitchToken
+		var twitchTokens twitchv1Model.TwitchToken
 		if err := userv1Service.GetUserTwitchTokens(uuid.MustParse(userId), &twitchTokens); err != nil {
 			return err
 		}

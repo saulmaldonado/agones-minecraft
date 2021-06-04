@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"agones-minecraft/config"
-	"agones-minecraft/models"
+	twitchv1Model "agones-minecraft/models/v1/twitch"
 	"agones-minecraft/resource/api/v1/errors"
 	userv1Service "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/auth/jwt"
@@ -25,7 +25,7 @@ const (
 func Authorizer() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId := c.GetString(SubjectKey)
-		var twitchTokens models.TwitchToken
+		var twitchTokens twitchv1Model.TwitchToken
 		// Gets tokens for user from DB
 		if err := userv1Service.GetUserTwitchTokens(uuid.MustParse(userId), &twitchTokens); err != nil {
 			if err == gorm.ErrRecordNotFound {

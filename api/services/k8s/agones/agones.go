@@ -17,7 +17,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"agones-minecraft/config"
-	"agones-minecraft/models"
+	gamev1Model "agones-minecraft/models/v1/game"
+	"agones-minecraft/resource/api/v1/game"
 	k8s "agones-minecraft/services/k8s"
 )
 
@@ -148,9 +149,9 @@ func (c *AgonesClient) ListRecords() []string {
 	return c.recordStore.List()
 }
 
-func GetEdition(gs *agonesv1.GameServer) models.Edition {
+func GetEdition(gs *agonesv1.GameServer) gamev1Model.Edition {
 	l := gs.GetLabels()
-	return models.Edition(l[EditionLabel])
+	return gamev1Model.Edition(l[EditionLabel])
 }
 
 func SetHostname(gs *agonesv1.GameServer, domain, subdomain string) {
@@ -178,13 +179,13 @@ func GetHostname(gs *agonesv1.GameServer) string {
 	return fmt.Sprintf("%s.%s", subdomain, domain)
 }
 
-func GetState(gs *agonesv1.GameServer) models.GameState {
+func GetStatus(gs *agonesv1.GameServer) game.Status {
 	if IsOnline(gs) {
-		return models.Online
+		return game.Online
 	} else if IsStarting(gs) {
-		return models.Starting
+		return game.Starting
 	}
-	return models.Stopping
+	return game.Stopping
 }
 
 func GetDNSZone() string {

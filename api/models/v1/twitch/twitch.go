@@ -1,4 +1,4 @@
-package models
+package twitch
 
 import (
 	"github.com/google/uuid"

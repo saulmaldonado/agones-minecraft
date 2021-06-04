@@ -1,10 +1,13 @@
-package models
+package user
 
 import (
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"agones-minecraft/models/v1/game"
+	"agones-minecraft/models/v1/twitch"
 )
 
 type User struct {
@@ -15,10 +18,10 @@ type User struct {
 	TwitchID       *string   `gorm:"uniqueIndex"`
 	TwitchUsername *string   `gorm:"size:25"`
 	TwitchPicture  *string
-	TwitchToken    TwitchToken `gorm:"constraint:OnDelete:CASCADE"`
-	MCUsername     *string     `gorm:"size:16"`
-	MCUUID         *uuid.UUID  `gorm:"type:uuid"`
-	Game           []Game
+	TwitchToken    twitch.TwitchToken `gorm:"constraint:OnDelete:CASCADE"`
+	MCUsername     *string            `gorm:"size:16"`
+	MCUUID         *uuid.UUID         `gorm:"type:uuid"`
+	Game           []game.Game
 	LastLogin      time.Time
 }
 

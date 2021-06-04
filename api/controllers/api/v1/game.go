@@ -11,7 +11,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"agones-minecraft/middleware/jwt"
-	"agones-minecraft/models"
+	gamev1Model "agones-minecraft/models/v1/game"
 	"agones-minecraft/resource/api/v1/errors"
 	gamev1Resource "agones-minecraft/resource/api/v1/game"
 	gamev1Service "agones-minecraft/services/api/v1/game"
@@ -44,7 +44,7 @@ func GetGameState(c *gin.Context) {
 	}
 
 	if gs, err := agones.Client().Get(name); err != nil {
-		var foundGame models.Game
+		var foundGame gamev1Model.Game
 		if k8sErrors.IsNotFound(err) {
 			if err := gamev1Service.GetGameByName(&foundGame, name); err != nil {
 				if err == gorm.ErrRecordNotFound {
@@ -55,7 +55,7 @@ func GetGameState(c *gin.Context) {
 				}
 			}
 			game.ID = foundGame.ID
-			game.State = models.Offline
+			game.Status = gamev1Resource.Offline
 			game.Edition = foundGame.Edition
 		} else {
 			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
@@ -64,7 +64,7 @@ func GetGameState(c *gin.Context) {
 	} else {
 		game.Edition = agones.GetEdition(gs)
 		game.ID = uuid.MustParse(string(gs.UID))
-		game.State = agones.GetState(gs)
+		game.Status = agones.GetStatus(gs)
 
 		if v, ok := c.Get(jwt.ContextKey); ok {
 			userId := v.(string)
@@ -92,10 +92,10 @@ func CreateJava(c *gin.Context) {
 		return
 	}
 
-	game := models.Game{
+	game := gamev1Model.Game{
 		CustomSubdomain: body.CustomSubdomain,
 		UserID:          userId,
-		Edition:         models.JavaEdition,
+		Edition:         gamev1Model.JavaEdition,
 	}
 	gs := agones.NewJavaServer()
 	agones.SetUserId(gs, userId) // Set userId label
@@ -115,7 +115,7 @@ func CreateJava(c *gin.Context) {
 		Name:      game.Name,
 		DNSRecord: agones.GetHostname(gs),
 		Edition:   game.Edition,
-		State:     models.Starting,
+		Status:    gamev1Resource.Starting,
 		CreatedAt: game.CreatedAt,
 	}
 
@@ -132,10 +132,10 @@ func CreateBedrock(c *gin.Context) {
 		return
 	}
 
-	game := models.Game{
+	game := gamev1Model.Game{
 		CustomSubdomain: body.CustomSubdomain,
 		UserID:          userId,
-		Edition:         models.BedrockEdition,
+		Edition:         gamev1Model.BedrockEdition,
 	}
 	gs := agones.NewBedrockServer()
 	agones.SetUserId(gs, userId) // Set userId label
@@ -155,7 +155,7 @@ func CreateBedrock(c *gin.Context) {
 		Name:      game.Name,
 		DNSRecord: agones.GetHostname(gs),
 		Edition:   game.Edition,
-		State:     models.Starting,
+		Status:    gamev1Resource.Starting,
 		CreatedAt: game.CreatedAt,
 	}
 
@@ -168,7 +168,7 @@ func DeleteGame(c *gin.Context) {
 
 	name := c.Param("name")
 
-	var game models.Game
+	var game gamev1Model.Game
 
 	if err := gamev1Service.GetGameByUserIdAndName(&game, userId, name); err != nil {
 		if err == gorm.ErrRecordNotFound {

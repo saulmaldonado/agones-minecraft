@@ -11,7 +11,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
-	"agones-minecraft/models"
+	twitchv1Model "agones-minecraft/models/v1/twitch"
+	userv1Model "agones-minecraft/models/v1/user"
 	"agones-minecraft/resource/api/v1/errors"
 	userv1Resource "agones-minecraft/resource/api/v1/user"
 	userv1 "agones-minecraft/services/api/v1/user"
@@ -66,13 +67,13 @@ func TwitchCallback(c *gin.Context) {
 		return
 	}
 
-	user := models.User{
+	user := userv1Model.User{
 		Email:          &payload.Email,
 		EmailVerified:  &payload.EmailVerified,
 		TwitchID:       &payload.Sub,
 		TwitchUsername: &payload.Username,
 		TwitchPicture:  &payload.Picture,
-		TwitchToken: models.TwitchToken{
+		TwitchToken: twitchv1Model.TwitchToken{
 			TwitchAccessToken:  &token.AccessToken,
 			TwitchRefreshToken: &token.RefreshToken,
 		},

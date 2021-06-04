@@ -8,25 +8,26 @@ import (
 	"gorm.io/gorm/clause"
 
 	"agones-minecraft/db"
-	"agones-minecraft/models"
+	twitchv1Model "agones-minecraft/models/v1/twitch"
+	userv1Model "agones-minecraft/models/v1/user"
 )
 
 var (
 	ErrUserRecordNotChanged error = errors.New("user record not changed")
 )
 
-func GetUserByEmail(email string, user *models.User) error {
+func GetUserByEmail(email string, user *userv1Model.User) error {
 	return db.DB().Where("email = ?", email).First(user).Error
 }
 
-func GetUserByTwitchId(user *models.User) error {
+func GetUserByTwitchId(user *userv1Model.User) error {
 	return db.DB().Where("twitch_id = ?", user.TwitchID).Joins("TwitchToken").First(user).Error
 }
 
-func UpsertUserByTwitchId(user *models.User, oldTokens chan string) error {
+func UpsertUserByTwitchId(user *userv1Model.User, oldTokens chan string) error {
 	return db.DB().Transaction(func(tx *gorm.DB) error {
 		defer close(oldTokens)
-		var foundUser models.User
+		var foundUser userv1Model.User
 		err := tx.Joins("TwitchToken").First(&foundUser, "twitch_id = ?", user.TwitchID).Error
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,9 +55,9 @@ func UpsertUserByTwitchId(user *models.User, oldTokens chan string) error {
 	})
 }
 
-func UpdateUser(user *models.User, oldTokens chan string) error {
+func UpdateUser(user *userv1Model.User, oldTokens chan string) error {
 	return db.DB().Transaction(func(tx *gorm.DB) error {
-		foundUser := models.User{
+		foundUser := userv1Model.User{
 			ID: user.ID,
 		}
 		if err := tx.Joins("TwitchToken").First(&foundUser).Error; err != nil {
@@ -82,31 +83,31 @@ func UpdateUser(user *models.User, oldTokens chan string) error {
 	})
 }
 
-func GetUserById(userId uuid.UUID, user *models.User) error {
+func GetUserById(userId uuid.UUID, user *userv1Model.User) error {
 	return db.DB().Joins("TwitchToken").First(user, userId).Error
 }
 
-func CreateUser(user *models.User) error {
+func CreateUser(user *userv1Model.User) error {
 	return db.DB().Create(user).Error
 }
 
-func EditUser(user *models.User) error {
+func EditUser(user *userv1Model.User) error {
 	return db.DB().Model(user).Updates(user).First(user).Error
 }
 
 // Finds a users stored Twitch access and refresh tokens
-func GetUserTwitchTokens(userId uuid.UUID, twitchToken *models.TwitchToken) error {
+func GetUserTwitchTokens(userId uuid.UUID, twitchToken *twitchv1Model.TwitchToken) error {
 	return db.DB().Where("user_id = ?", userId).First(twitchToken).Error
 }
 
-func UpdateUserTwitchTokens(userId uuid.UUID, twitchToken *models.TwitchToken) error {
+func UpdateUserTwitchTokens(userId uuid.UUID, twitchToken *twitchv1Model.TwitchToken) error {
 	if err := db.DB().Where("user_id = ?", userId).Updates(twitchToken).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func updateUserIfChanged(tx *gorm.DB, user *models.User, foundUser *models.User) error {
+func updateUserIfChanged(tx *gorm.DB, user *userv1Model.User, foundUser *userv1Model.User) error {
 	if *user.Email != *foundUser.Email ||
 		*user.TwitchUsername != *foundUser.TwitchUsername ||
 		*user.TwitchPicture != *foundUser.TwitchPicture {

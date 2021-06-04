@@ -64,7 +64,7 @@ func NewRouter() *gin.Engine {
 		game := v1.Group("/game")
 		{
 			game.GET("", v1Controllers.ListGames)
-			game.GET("/:name/state", jwt.Authenticator(), v1Controllers.GetGameState)
+			game.GET("/:name/status", jwt.Authenticator(), v1Controllers.GetGameState)
 			game.GET("/:name", v1Controllers.GetGame)
 
 			game.Use(jwt.Authorizer())

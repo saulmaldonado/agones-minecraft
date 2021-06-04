@@ -2,33 +2,33 @@ package game
 
 import (
 	"agones-minecraft/db"
-	"agones-minecraft/models"
 	"errors"
-
-	"agones-minecraft/services/k8s/agones"
 
 	v1 "agones.dev/agones/pkg/apis/agones/v1"
 	"github.com/google/uuid"
+
+	gamev1Model "agones-minecraft/models/v1/game"
+	"agones-minecraft/services/k8s/agones"
 )
 
 var (
 	ErrSubdomainTaken error = errors.New("custom subdomain not available")
 )
 
-func GetGameById(game *models.Game, ID uuid.UUID) error {
+func GetGameById(game *gamev1Model.Game, ID uuid.UUID) error {
 	game.ID = ID
 	return db.DB().First(game).Error
 }
 
-func GetGameByName(game *models.Game, name string) error {
+func GetGameByName(game *gamev1Model.Game, name string) error {
 	return db.DB().Where("name = ?", name).First(game).Error
 }
 
-func GetGameByUserIdAndName(game *models.Game, userId uuid.UUID, name string) error {
+func GetGameByUserIdAndName(game *gamev1Model.Game, userId uuid.UUID, name string) error {
 	return db.DB().Where("user_id = ? AND name = ?", userId, name).First(game).Error
 }
 
-func CreateGame(game *models.Game, gs *v1.GameServer) error {
+func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
 	if game.CustomSubdomain != nil {
 		if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), *game.CustomSubdomain); !ok {
 			return ErrSubdomainTaken
@@ -45,7 +45,7 @@ func CreateGame(game *models.Game, gs *v1.GameServer) error {
 
 	game.ID = uuid.MustParse(string(gameServer.UID))
 	game.Name = gameServer.Name
-	game.GameState = models.Online
+	game.GameState = gamev1Model.On
 
 	if err := db.DB().Create(game).Error; err != nil {
 		// attempt to revert server
@@ -56,10 +56,10 @@ func CreateGame(game *models.Game, gs *v1.GameServer) error {
 	return nil
 }
 
-func DeleteGame(game *models.Game) error {
+func DeleteGame(game *gamev1Model.Game) error {
 	return db.DB().Delete(game).Error
 }
 
-func UpdateGame(game *models.Game) error {
+func UpdateGame(game *gamev1Model.Game) error {
 	return db.DB().Model(game).Updates(game).First(game).Error
 }

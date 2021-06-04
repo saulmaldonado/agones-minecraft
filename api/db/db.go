@@ -11,7 +11,9 @@ import (
 	"moul.io/zapgorm2"
 
 	"agones-minecraft/config"
-	"agones-minecraft/models"
+	gamev1Model "agones-minecraft/models/v1/game"
+	twitchv1Model "agones-minecraft/models/v1/twitch"
+	userv1Model "agones-minecraft/models/v1/user"
 )
 
 const (
@@ -41,7 +43,7 @@ func Init() {
 	}
 
 	if config.GetEnv() == config.Development {
-		if err = db.AutoMigrate(&models.User{}, &models.TwitchToken{}, &models.Game{}); err != nil {
+		if err = db.AutoMigrate(&userv1Model.User{}, &twitchv1Model.TwitchToken{}, &gamev1Model.Game{}); err != nil {
 			zap.L().Fatal("error auto-migrating db", zap.Error(err))
 		}
 	}

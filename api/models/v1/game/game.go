@@ -1,4 +1,4 @@
-package models
+package game
 
 import (
 	"github.com/google/uuid"
@@ -12,10 +12,8 @@ const (
 	JavaEdition    Edition = "java"
 	BedrockEdition Edition = "bedrock"
 
-	Online   GameState = "online"
-	Offline  GameState = "offline"
-	Starting GameState = "starting"
-	Stopping GameState = "stopping"
+	On  GameState = "ON"
+	Off GameState = "OFF"
 )
 
 type Game struct {
