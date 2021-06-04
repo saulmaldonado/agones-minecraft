@@ -46,33 +46,19 @@ func CreateJava(c *gin.Context) {
 		return
 	}
 
-	gs := agones.NewJavaServer()
-
-	if body.CustomSubdomain != nil {
-		if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), *body.CustomSubdomain); !ok {
-			c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("custom subdomain %s not available", *body.CustomSubdomain)))
-			return
-		}
-		agones.SetHostname(gs, agones.GetDNSZone(), *body.CustomSubdomain)
-	}
-
-	gameServer, err := agones.Client().Create(gs)
-	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		return
-	}
-
 	game := models.Game{
-		ID:              uuid.MustParse(string(gameServer.UID)),
-		UserID:          userId,
-		Name:            gameServer.Name,
 		CustomSubdomain: body.CustomSubdomain,
+		UserID:          userId,
 		Edition:         models.JavaEdition,
 	}
+	gs := agones.NewJavaServer()
 
-	if err := gamev1Service.CreateGame(&game); err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		agones.Client().Delete(gameServer.Name)
+	if err := gamev1Service.CreateGame(&game, gs); err != nil {
+		if err == gamev1Service.ErrSubdomainTaken {
+			c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+		} else {
+			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		}
 		return
 	}
 
@@ -80,8 +66,9 @@ func CreateJava(c *gin.Context) {
 		ID:        game.ID,
 		UserID:    game.UserID,
 		Name:      game.Name,
-		DNSRecord: agones.GetHostname(gameServer),
+		DNSRecord: agones.GetHostname(gs),
 		Edition:   game.Edition,
+		State:     models.Starting,
 		CreatedAt: game.CreatedAt,
 	}
 
@@ -98,33 +85,19 @@ func CreateBedrock(c *gin.Context) {
 		return
 	}
 
-	gs := agones.NewJavaServer()
-
-	if body.CustomSubdomain != nil {
-		if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), *body.CustomSubdomain); !ok {
-			c.Errors = append(c.Errors, errors.NewBadRequestError(fmt.Errorf("custom subdomain %s not available", *body.CustomSubdomain)))
-			return
-		}
-		agones.SetHostname(gs, agones.GetDNSZone(), *body.CustomSubdomain)
-	}
-
-	gameServer, err := agones.Client().Create(gs)
-	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		return
-	}
-
 	game := models.Game{
-		ID:              uuid.MustParse(string(gameServer.UID)),
-		UserID:          userId,
-		Name:            gameServer.Name,
 		CustomSubdomain: body.CustomSubdomain,
+		UserID:          userId,
 		Edition:         models.BedrockEdition,
 	}
+	gs := agones.NewBedrockServer()
 
-	if err := gamev1Service.CreateGame(&game); err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		agones.Client().Delete(gameServer.Name)
+	if err := gamev1Service.CreateGame(&game, gs); err != nil {
+		if err == gamev1Service.ErrSubdomainTaken {
+			c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+		} else {
+			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		}
 		return
 	}
 
@@ -132,8 +105,9 @@ func CreateBedrock(c *gin.Context) {
 		ID:        game.ID,
 		UserID:    game.UserID,
 		Name:      game.Name,
-		DNSRecord: agones.GetHostname(gameServer),
+		DNSRecord: agones.GetHostname(gs),
 		Edition:   game.Edition,
+		State:     models.Starting,
 		CreatedAt: game.CreatedAt,
 	}
 
