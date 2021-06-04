@@ -67,3 +67,14 @@ func NewNotFoundError(err error) *gin.Error {
 		Type: gin.ErrorTypeAny,
 	}
 }
+
+func NewGoneError(err error) *gin.Error {
+	return &gin.Error{
+		Err: &APIError{
+			Err:          nil,
+			ErrorMessage: err.Error(),
+			StatusCode:   http.StatusGone,
+		},
+		Type: gin.ErrorTypeAny,
+	}
+}

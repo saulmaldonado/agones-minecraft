@@ -20,6 +20,10 @@ func GetGameById(game *models.Game, ID uuid.UUID) error {
 	return db.DB().First(game).Error
 }
 
+func GetGameByName(game *models.Game, name string) error {
+	return db.DB().Where("name = ?", name).First(game).Error
+}
+
 func GetGameByUserIdAndName(game *models.Game, userId uuid.UUID, name string) error {
 	return db.DB().Where("user_id = ? AND name = ?", userId, name).First(game).Error
 }

@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"agones-minecraft/config"
+	"agones-minecraft/models"
 	k8s "agones-minecraft/services/k8s"
 )
 
@@ -145,6 +146,11 @@ func (c *AgonesClient) ListRecords() []string {
 	return c.recordStore.List()
 }
 
+func GetEdition(gs *agonesv1.GameServer) models.Edition {
+	l := gs.GetLabels()
+	return models.Edition(l[EditionLabel])
+}
+
 func SetHostname(gs *agonesv1.GameServer, domain, subdomain string) {
 	anno := gs.GetAnnotations()
 	anno[CustomSubdomainAnnotation] = subdomain
@@ -170,8 +176,36 @@ func GetHostname(gs *agonesv1.GameServer) string {
 	return fmt.Sprintf("%s.%s", subdomain, domain)
 }
 
+func GetState(gs *agonesv1.GameServer) models.GameState {
+	if IsOnline(gs) {
+		return models.Online
+	} else if IsStarting(gs) {
+		return models.Starting
+	}
+	return models.Stopping
+}
+
 func GetDNSZone() string {
 	return config.GetDNSZone()
+}
+
+func IsStarting(gs *agonesv1.GameServer) bool {
+	state := gs.Status.State
+	return IsBeforePodCreated(gs) ||
+		state == agonesv1.GameServerStateScheduled ||
+		state == agonesv1.GameServerStateRequestReady
+}
+
+func IsOnline(gs *agonesv1.GameServer) bool {
+	state := gs.Status.State
+	return state == agonesv1.GameServerStateReady || state == agonesv1.GameServerStateAllocated
+}
+
+func IsBeforePodCreated(gs *agonesv1.GameServer) bool {
+	state := gs.Status.State
+	return state == agonesv1.GameServerStatePortAllocation ||
+		state == agonesv1.GameServerStateCreating ||
+		state == agonesv1.GameServerStateStarting
 }
 
 // Initializes a new default Java Minecraft server

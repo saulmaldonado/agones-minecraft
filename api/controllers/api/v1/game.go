@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"agones-minecraft/middleware/jwt"
 	"agones-minecraft/models"
@@ -34,6 +35,40 @@ func GetGame(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gameServer)
+}
+
+func GetGameState(c *gin.Context) {
+	name := c.Param("name")
+	game := gamev1Resource.GameStatus{
+		Name: name,
+	}
+
+	gs, err := agones.Client().Get(name)
+	if err != nil {
+		var foundGame models.Game
+		if k8sErrors.IsNotFound(err) {
+			if err := gamev1Service.GetGameByName(&foundGame, name); err != nil {
+				if err == gorm.ErrRecordNotFound {
+					c.Errors = append(c.Errors, errors.NewNotFoundError(fmt.Errorf("game server not found")))
+					return
+				} else {
+					c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+				}
+			}
+			game.ID = foundGame.ID
+			game.State = models.Offline
+			game.Edition = foundGame.Edition
+		} else {
+			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			return
+		}
+	} else {
+		game.Edition = agones.GetEdition(gs)
+		game.ID = uuid.MustParse(string(gs.UID))
+		game.State = agones.GetState(gs)
+	}
+
+	c.JSON(http.StatusOK, game)
 }
 
 func CreateJava(c *gin.Context) {

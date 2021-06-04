@@ -20,3 +20,11 @@ type Game struct {
 	State     models.GameState `json:"state"`
 	CreatedAt time.Time        `json:"createdAt"`
 }
+
+type GameStatus struct {
+	ID      uuid.UUID        `json:"id"`
+	Name    string           `json:"name"`
+	State   models.GameState `json:"state"`
+	Edition models.Edition   `json:"edition"`
+	Port    int32            `json:"port,omitempty"`
+}
