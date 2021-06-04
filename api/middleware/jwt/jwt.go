@@ -44,7 +44,7 @@ func Authorizer() gin.HandlerFunc {
 		}
 
 		if err := jwt.ValidateToken(token); err != nil {
-			c.Errors = append(c.Errors, errors.NewUnauthorizedError(err))
+			c.Errors = append(c.Errors, errors.NewUnauthorizedError(fmt.Errorf("invalid access token")))
 			c.Abort()
 			return
 		}
