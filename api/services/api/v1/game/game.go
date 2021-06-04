@@ -40,6 +40,8 @@ func CreateGame(game *models.Game, gs *v1.GameServer) error {
 	if err != nil {
 		return err
 	}
+	// point to newly created gameserver obj
+	*gs = *gameServer
 
 	game.ID = uuid.MustParse(string(gameServer.UID))
 	game.Name = gameServer.Name
