@@ -43,8 +43,7 @@ func GetGameState(c *gin.Context) {
 		Name: name,
 	}
 
-	gs, err := agones.Client().Get(name)
-	if err != nil {
+	if gs, err := agones.Client().Get(name); err != nil {
 		var foundGame models.Game
 		if k8sErrors.IsNotFound(err) {
 			if err := gamev1Service.GetGameByName(&foundGame, name); err != nil {
@@ -66,6 +65,18 @@ func GetGameState(c *gin.Context) {
 		game.Edition = agones.GetEdition(gs)
 		game.ID = uuid.MustParse(string(gs.UID))
 		game.State = agones.GetState(gs)
+
+		if v, ok := c.Get(jwt.ContextKey); ok {
+			userId := v.(string)
+			if userId == agones.GetUserId(gs) && !agones.IsBeforePodCreated(gs) {
+				port := agones.GetPort(gs)
+
+				host := agones.GetHostname(gs)
+				game.Hostname = &host
+				game.Address = &gs.Status.Address
+				game.Port = &port
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, game)
@@ -87,6 +98,7 @@ func CreateJava(c *gin.Context) {
 		Edition:         models.JavaEdition,
 	}
 	gs := agones.NewJavaServer()
+	agones.SetUserId(gs, userId) // Set userId label
 
 	if err := gamev1Service.CreateGame(&game, gs); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
@@ -126,6 +138,7 @@ func CreateBedrock(c *gin.Context) {
 		Edition:         models.BedrockEdition,
 	}
 	gs := agones.NewBedrockServer()
+	agones.SetUserId(gs, userId) // Set userId label
 
 	if err := gamev1Service.CreateGame(&game, gs); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {

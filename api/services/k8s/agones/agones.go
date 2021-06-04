@@ -7,6 +7,7 @@ import (
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"agones.dev/agones/pkg/client/clientset/versioned"
 	v1Informers "agones.dev/agones/pkg/client/informers/externalversions/agones/v1"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +72,7 @@ const (
 	// labels
 
 	EditionLabel string = "edition"
+	UserIdLabel  string = "userId"
 )
 
 var agonesClient *AgonesClient
@@ -187,6 +189,21 @@ func GetState(gs *agonesv1.GameServer) models.GameState {
 
 func GetDNSZone() string {
 	return config.GetDNSZone()
+}
+
+func GetUserId(gs *agonesv1.GameServer) string {
+	return gs.Labels[UserIdLabel]
+}
+
+func SetUserId(gs *agonesv1.GameServer, userId uuid.UUID) {
+	gs.Labels[UserIdLabel] = userId.String()
+}
+
+func GetPort(gs *agonesv1.GameServer) int32 {
+	if IsBeforePodCreated(gs) {
+		return 0
+	}
+	return gs.Status.Ports[0].Port
 }
 
 func IsStarting(gs *agonesv1.GameServer) bool {

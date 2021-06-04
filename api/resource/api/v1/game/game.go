@@ -22,9 +22,11 @@ type Game struct {
 }
 
 type GameStatus struct {
-	ID      uuid.UUID        `json:"id"`
-	Name    string           `json:"name"`
-	State   models.GameState `json:"state"`
-	Edition models.Edition   `json:"edition"`
-	Port    int32            `json:"port,omitempty"`
+	ID       uuid.UUID        `json:"id"`
+	Name     string           `json:"name"`
+	State    models.GameState `json:"state"`
+	Edition  models.Edition   `json:"edition"`
+	Hostname *string          `json:"hostname"`
+	Address  *string          `json:"address"`
+	Port     *int32           `json:"port"`
 }
