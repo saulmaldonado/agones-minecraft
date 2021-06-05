@@ -6,13 +6,15 @@ import (
 
 	v1 "agones.dev/agones/pkg/apis/agones/v1"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	gamev1Model "agones-minecraft/models/v1/game"
 	"agones-minecraft/services/k8s/agones"
 )
 
 var (
-	ErrSubdomainTaken error = errors.New("custom subdomain not available")
+	ErrSubdomainTaken     error = errors.New("custom subdomain not available")
+	ErrGameServerNotFound error = errors.New("game server not found")
 )
 
 func GetGameById(game *gamev1Model.Game, ID uuid.UUID) error {
@@ -56,8 +58,25 @@ func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
 	return nil
 }
 
-func DeleteGame(game *gamev1Model.Game) error {
-	return db.DB().Delete(game).Error
+func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {
+	return db.DB().Transaction(func(tx *gorm.DB) error {
+		if err := GetGameByUserIdAndName(game, userId, name); err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return ErrGameServerNotFound
+			}
+			return err
+		}
+
+		if err := db.DB().Delete(game).Error; err != nil {
+			return err
+		}
+
+		if err := agones.Client().Delete(name); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func UpdateGame(game *gamev1Model.Game) error {

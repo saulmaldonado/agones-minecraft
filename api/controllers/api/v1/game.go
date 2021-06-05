@@ -170,24 +170,12 @@ func DeleteGame(c *gin.Context) {
 
 	var game gamev1Model.Game
 
-	if err := gamev1Service.GetGameByUserIdAndName(&game, userId, name); err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.Errors = append(c.Errors, errors.NewNotFoundError(fmt.Errorf("game server %s for user %s not found", name, userId)))
+	if err := gamev1Service.DeleteGame(&game, userId, name); err != nil {
+		if err == gamev1Service.ErrGameServerNotFound {
+			c.Errors = append(c.Errors, errors.NewNotFoundError(err))
 		} else {
 			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		}
-		return
-	}
-
-	if err := gamev1Service.DeleteGame(&game); err != nil {
-		if err != nil {
-			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
-		}
-		return
-	}
-
-	if err := agones.Client().Delete(name); err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
 		return
 	}
 
