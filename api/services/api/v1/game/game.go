@@ -31,31 +31,36 @@ func GetGameByUserIdAndName(game *gamev1Model.Game, userId uuid.UUID, name strin
 }
 
 func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
-	if game.CustomSubdomain != nil {
-		if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), *game.CustomSubdomain); !ok {
-			return ErrSubdomainTaken
+	return db.DB().Transaction(func(tx *gorm.DB) error {
+		if game.CustomSubdomain != nil {
+			if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), *game.CustomSubdomain); !ok {
+				return ErrSubdomainTaken
+			}
+			agones.SetHostname(gs, agones.GetDNSZone(), *game.CustomSubdomain)
 		}
-		agones.SetHostname(gs, agones.GetDNSZone(), *game.CustomSubdomain)
-	}
 
-	gameServer, err := agones.Client().Create(gs)
-	if err != nil {
-		return err
-	}
-	// point to newly created gameserver obj
-	*gs = *gameServer
+		gameServer, err := agones.Client().CreateDryRun(gs)
+		if err != nil {
+			return err
+		}
 
-	game.ID = uuid.MustParse(string(gameServer.UID))
-	game.Name = gameServer.Name
-	game.GameState = gamev1Model.On
+		// point to newly created gameserver obj
+		*gs = *gameServer
 
-	if err := db.DB().Create(game).Error; err != nil {
-		// attempt to revert server
-		agones.Client().Delete(gameServer.Name)
-		return err
-	}
+		game.ID = uuid.MustParse(string(gs.UID))
+		game.Name = gs.Name
+		game.GameState = gamev1Model.On
 
-	return nil
+		if err := db.DB().Create(game).Error; err != nil {
+			return err
+		}
+
+		if _, err := agones.Client().Create(gs); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {

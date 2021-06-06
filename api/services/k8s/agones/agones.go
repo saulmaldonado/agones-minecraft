@@ -131,6 +131,16 @@ func (c *AgonesClient) Create(server *agonesv1.GameServer) (*agonesv1.GameServer
 		Create(context.Background(), server, metav1.CreateOptions{})
 }
 
+// Creates a new GameServer with dry-run option enabled
+func (c *AgonesClient) CreateDryRun(server *agonesv1.GameServer) (*agonesv1.GameServer, error) {
+	return c.clientSet.
+		AgonesV1().
+		GameServers(metav1.NamespaceDefault).
+		Create(context.Background(), server, metav1.CreateOptions{
+			DryRun: []string{"All"},
+		})
+}
+
 // Deletes a GameServer by name
 func (c *AgonesClient) Delete(serverName string) error {
 	return c.clientSet.
