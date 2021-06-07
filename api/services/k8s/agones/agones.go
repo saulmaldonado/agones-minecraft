@@ -3,6 +3,7 @@ package agones
 import (
 	"context"
 	"fmt"
+	"time"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"agones.dev/agones/pkg/client/clientset/versioned"
@@ -17,7 +18,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"agones-minecraft/config"
-	gamev1Model "agones-minecraft/models/v1/game"
+	worldv1Model "agones-minecraft/models/v1/world"
 	"agones-minecraft/resource/api/v1/game"
 	k8s "agones-minecraft/services/k8s"
 )
@@ -91,8 +92,18 @@ func Init() {
 	if err != nil {
 		zap.L().Fatal("error initializing agones client", zap.Error(err))
 	}
+
 	go c.informer.Informer().Run(wait.NeverStop)
-	cache.WaitForCacheSync(wait.NeverStop, c.informer.Informer().HasSynced)
+
+	stop := make(chan struct{})
+
+	time.AfterFunc(time.Second*30, func() {
+		close(stop)
+	})
+
+	if !cache.WaitForCacheSync(stop, c.informer.Informer().HasSynced) {
+		zap.L().Fatal("error syncing cache")
+	}
 	agonesClient = c
 }
 
@@ -104,11 +115,11 @@ func Client() *AgonesClient {
 // Creates new Agones client
 func New(config *rest.Config) (*AgonesClient, error) {
 	agonesClient, err := versioned.NewForConfig(config)
-	gameServerInformer := NewGameServerInformer(agonesClient)
-	recordStore := NewGameServerDNSRecordStore(gameServerInformer)
 	if err != nil {
 		return nil, err
 	}
+	gameServerInformer := NewGameServerInformer(agonesClient)
+	recordStore := NewGameServerDNSRecordStore(gameServerInformer)
 
 	return &AgonesClient{agonesClient, gameServerInformer, recordStore}, nil
 }
@@ -159,9 +170,9 @@ func (c *AgonesClient) ListRecords() []string {
 	return c.recordStore.List()
 }
 
-func GetEdition(gs *agonesv1.GameServer) gamev1Model.Edition {
+func GetEdition(gs *agonesv1.GameServer) worldv1Model.Edition {
 	l := gs.GetLabels()
-	return gamev1Model.Edition(l[EditionLabel])
+	return worldv1Model.Edition(l[EditionLabel])
 }
 
 func SetHostname(gs *agonesv1.GameServer, domain, subdomain string) {
