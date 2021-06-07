@@ -1,2 +1,16 @@
 build
 .env
+
+**/.terraform/*
+
+*.tfstate
+*.tfstate.*
+
+crash.log
+
+exampl.tfvars
+
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
