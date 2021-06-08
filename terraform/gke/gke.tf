@@ -21,6 +21,22 @@ variable "cluster_version" {
   description = "gke cluster version"
 }
 
+variable "auto_scaling" {
+  type = bool
+  default = false
+  description = "enable cluster node auto scaling"
+}
+
+variable "min_node_count" {
+  type = number
+  description = "minimum node count for auto scaling"
+}
+
+variable "max_node_count" {
+  type = number
+  description = "maximum node count for auto scaling"
+}
+
 data "google_client_config" "default" {}
 
 provider "google" {
@@ -42,6 +58,14 @@ resource "google_container_cluster" "primary" {
 
     management {
       auto_upgrade = false
+    }
+
+    dynamic "autoscaling" {
+      for_each = var.auto_scaling ? [1] : []
+      content {
+        max_node_count = var.max_node_count
+        min_node_count = var.min_node_count
+      }
     }
 
     node_config {
