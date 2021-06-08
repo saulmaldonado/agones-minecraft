@@ -3,12 +3,13 @@ SHELL=/bin/bash -o pipefail
 TAG := $(strip $(shell git describe --tags --exact-match HEAD 2> /dev/null | cut -c 2- || git rev-parse --short HEAD))
 
 CONTROLLER_PATH := controller
+TERRAFORM_PATH := terraform
 USERNAME := saulmaldonado
 
 include .env
 export
 
-.PHONY: build
+.PHONY: build terraform
 
 all:
 	@$(MAKE) -C $(CONTROLLER_PATH)
@@ -33,3 +34,6 @@ go-build:
 
 go-run:
 	@$(MAKE) -C $(CONTROLLER_PATH) go-run
+
+tf:
+	@$(MAKE) -C $(TERRAFORM_PATH)
