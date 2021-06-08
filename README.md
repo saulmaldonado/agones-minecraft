@@ -4,12 +4,153 @@ Minecraft dedicated game server cluster hosting solution using GKE and Agones.
 
 Suitable for both ephemeral and eternal game servers
 
-## Installation
+Current architecture consists of:
+
+- Kubernetes cluster with Agones CRDs and controllers for deploying Minecraft server game pods
+
+- Custom Java and Bedrock Minecraft server kubernetes pods specs with sidecar services for health checking, auto world backup and, auto world loading
+
+- Controller managed DNS zone for auto provisioning custom DNS `A` and `SRV` records for Minecraft servers
+
+## Terraform
+
+### Prerequisites
+
+- [a GCP project](https://cloud.google.com/)
+
+- [a domain you own or manage](https://domains.google/)
+
+- [gcloud](https://cloud.google.com/sdk/docs/install)
+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/included/install-kubectl-gcloud/)
+
+- [terraform >= 0.15.0](https://www.terraform.io/downloads.html)
+
+#### Get default credentials for project to use with Terraform
+
+```sh
+gcloud auth application-default login
+```
+
+#### Enable services for GKE, Cloud DNS, and Cloud Storage
+
+```sh
+gcloud services enable compute.googleapis.com container.googleapis.com dns.googleapis.com storage-component.googleapis.com
+```
+
+#### Change tf variables if needed
+
+```sh
+nano terraform/terraform.tfvars
+```
+
+##### Variables
+
+- `region`
+  - `string`
+  - Cluster VPC region
+
+- `zone`
+  - `string`
+  - Cluster zone
+
+- `storage_location`
+  - `string`
+  - GCS storage location
+
+- `agones_version`
+  - `string`
+  - Agones helm chart version
+
+- `cluster_version`
+  - `string`
+  - Kubernetes master and node version (set to 1.18.18 as recommended by Agones)
+
+- `auto_scaling`
+  - `bool`
+  - enable node auto scaling. Only recommended for strictly ephemeral game server clusters
+
+- `min_node_count`
+  - `number`
+  - minimum node count for auto scaling
+
+- `max_node_count`
+  - `number`
+  - maximum node count for auto scaling
+
+### Run
+
+The following Terraform configuration will provision:
+
+- A 2 _n2-standard-4 (4 x vCPU, 16GB RAM)_ node zonal _us-central1-a_ GKE cluster (with optional auto scaling)
+
+- A Custom _us-central1_ VPC network
+
+- Firewall rules for `TCP` and `UDP` traffic on ports `7000-8000` from anywhere for cluster nodes
+
+- A Multi-regional _us_ storage bucket for Minecraft world archives
+
+- A DNS zone for an owned or managed domain
+
+- Agones Helm chart installation with an HTTP ping service behind a cluster provisioned GCP Load Balancer
+
+- An [ExternalDNS](https://github.com/saulmaldonado/external-dns) controller deployment for DNS record management
+
+Command will run `terraform init`, `plan`, and `apply`.
+
+```sh
+make tf
+```
+
+#### Inputs
+
+Terraform CLI will ask for inputs for your domain and GCP project ID
+
+```sh
+# Example
+
+var.dns_name
+  managed dns zone name
+
+  Enter a value: example.com.
+
+var.project_id
+  gcp project id
+
+  Enter a value: agones-minecraft-xxxxx
+```
+
+#### Outputs
+
+Outputs will include the name servers for your DNS zone. Configure your domain to point to these name servers
+
+```sh
+# Example
+
+Outputs:
+
+name_servers = tolist([
+  "ns-cloud-e1.googledomains.com.",
+  "ns-cloud-e2.googledomains.com.",
+  "ns-cloud-e3.googledomains.com.",
+  "ns-cloud-e4.googledomains.com.",
+])
+```
+
+## Manual Installation
 
 ### Prerequisites
 
 - [gcloud](https://cloud.google.com/sdk/docs/install)
+
 - [kubectl](https://kubernetes.io/docs/tasks/tools/included/install-kubectl-gcloud/)
+
+- [A GCP project](https://cloud.google.com/)
+
+- [a domain you own or manage](https://domains.google/)
+
+- [terraform >= 0.15.0](https://www.terraform.io/downloads.html)
+
 
 ### 1. Create public DNS Zone
 
@@ -17,7 +158,7 @@ This public DNS zone will be used to assign `A` and `SRV` DNS record to Minecraf
 
 ```sh
 gcloud dns managed-zones create agones-minecraft \
-    --description="agones-mc-dns-controller managed DNS zone" \
+    --description="externalDNS managed DNS zone" \
     --dns-name=<DOMAIN> \
     --visibility=public
 ```
@@ -32,15 +173,16 @@ gcloud dns managed-zones describe agones-minecraft
 
 World archives will be storage on GCP Cloud Storage buckets. Object storage offers better portability, easier management, and an overall better price over volumes.
 
-The following command will make a bucket named `agones-minecraft-mc-worlds`. This will make a single bucket that will contain all archives.
+The following command will make a multi-region bucket named `agones-minecraft-mc-worlds` in the `us`. In GCS, bucket names must be globally unique so **use a different name**.
+Since bucket creation rate limited to [1 every 2 seconds](https://cloud.google.com/storage/quotas), A single bucket containing all backups will be made.
 
 ```
-gsutil mb -l us-central1 gs://agones-minecraft-mc-worlds
+gsutil mb -l us gs://agones-minecraft-mc-worlds
 ```
 
 ### 3. Create Kubernetes Cluster
 
-Creates GKE cluster with 2 _n2-standard-4_ (4 x vCPU, 16GB), tags for firewall, and necessary scopes for Cloud DNS and Cloud Storage
+Creates GKE cluster with 2 _n2-standard-4_ (4 x vCPU, 16GB RAM), tags for firewall, and necessary scopes for Cloud DNS and Cloud Storage
 
 ```sh
 gcloud container clusters create minecraft --cluster-version=1.18 \
@@ -49,6 +191,18 @@ gcloud container clusters create minecraft --cluster-version=1.18 \
   --num-nodes=2 \
   --no-enable-autoupgrade \
   --machine-type=n2-standard-4
+```
+
+Optionally, for strictly ephemeral game servers, you can enable node autoscaling
+
+```sh
+gcloud container clusters create minecraft --cluster-version=1.18 \
+  --tags=mc \
+  --scopes=gke-default,storage-rw,"https://www.googleapis.com/auth/ndev.clouddns.readwrite" \
+  --num-nodes=2 \
+  --no-enable-autoupgrade \
+  --machine-type=n2-standard-4 \
+  --enable-autoscaling
 ```
 
 Set cluster as default and get credentials for `kubectl`
