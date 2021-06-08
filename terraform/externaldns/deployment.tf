@@ -33,10 +33,10 @@ resource "kubernetes_deployment" "externaldns" {
       spec {
         service_account_name = "external-dns"
         container {
-          image              = "saulmaldonado/external-dns"
-          name               = "external-dns"
-          args               = [ "--source=gameserver",  "--provider=google", "--registry=txt", "--txt-owner-id=external-dns-controller"]
-          image_pull_policy  = "Always"
+          image             = "saulmaldonado/external-dns"
+          name              = "external-dns"
+          args              = ["--source=gameserver", "--provider=google", "--registry=txt", "--txt-owner-id=external-dns-controller"]
+          image_pull_policy = "Always"
         }
       }
     }
@@ -56,14 +56,14 @@ resource "kubernetes_cluster_role" "externaldns" {
 
   rule {
     api_groups = [""]
-    resources  = ["services","endpoints","pods"]
-    verbs      = ["get","watch","list"]
+    resources  = ["services", "endpoints", "pods"]
+    verbs      = ["get", "watch", "list"]
   }
 
   rule {
-    api_groups = ["extensions","networking.k8s.io"]
+    api_groups = ["extensions", "networking.k8s.io"]
     resources  = ["ingresses"]
-    verbs      = ["get","watch","list"]
+    verbs      = ["get", "watch", "list"]
   }
 
   rule {
@@ -75,14 +75,14 @@ resource "kubernetes_cluster_role" "externaldns" {
   rule {
     api_groups = ["agones.dev"]
     resources  = ["gameservers"]
-    verbs      = ["get","watch","list"]
+    verbs      = ["get", "watch", "list"]
   }
 }
 
 
 resource "kubernetes_cluster_role_binding" "externaldns" {
   metadata {
-    name      = "external-dns-viewer"
+    name = "external-dns-viewer"
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"

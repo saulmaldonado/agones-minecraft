@@ -27,39 +27,39 @@ variable "agones_version" {
 }
 
 variable "auto_scaling" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "enable cluster node auto scaling"
 }
 
 variable "min_node_count" {
-  type = number
+  type        = number
   description = "minimum node count for auto scaling"
 }
 
 variable "max_node_count" {
-  type = number
+  type        = number
   description = "maximum node count for auto scaling"
 }
 
 module "gke_cluster" {
   source = "./gke"
 
-  project_id         = var.project_id
-  region             = var.region
-  zone               = var.zone
-  dns_name           = var.dns_name
-  cluster_version    = var.cluster_version
-  storage_location   = var.storage_location
-  auto_scaling       = var.auto_scaling
-  min_node_count     = var.min_node_count
-  max_node_count     = var.max_node_count
+  project_id       = var.project_id
+  region           = var.region
+  zone             = var.zone
+  dns_name         = var.dns_name
+  cluster_version  = var.cluster_version
+  storage_location = var.storage_location
+  auto_scaling     = var.auto_scaling
+  min_node_count   = var.min_node_count
+  max_node_count   = var.max_node_count
 }
 
 module "helm_agones" {
-  source                 = "./agones-helm"
+  source = "./agones-helm"
 
-  agones_version         = var.agones_version
+  agones_version = var.agones_version
 
   host                   = module.gke_cluster.host
   token                  = module.gke_cluster.token
@@ -77,5 +77,5 @@ module "external_dns" {
 
 output "name_servers" {
   description = "name servers for DNS zone"
-  value = module.gke_cluster.name_servers
+  value       = module.gke_cluster.name_servers
 }

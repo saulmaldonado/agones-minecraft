@@ -22,18 +22,18 @@ variable "cluster_version" {
 }
 
 variable "auto_scaling" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "enable cluster node auto scaling"
 }
 
 variable "min_node_count" {
-  type = number
+  type        = number
   description = "minimum node count for auto scaling"
 }
 
 variable "max_node_count" {
-  type = number
+  type        = number
   description = "maximum node count for auto scaling"
 }
 

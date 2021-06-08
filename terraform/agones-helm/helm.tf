@@ -36,7 +36,7 @@ resource "helm_release" "agones" {
   }
 
   set {
-    name = "agones.allocator.install"
+    name  = "agones.allocator.install"
     value = false
   }
 
