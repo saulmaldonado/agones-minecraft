@@ -1,6 +1,8 @@
 package main
 
 import (
+	"go.uber.org/zap"
+
 	"agones-minecraft/config"
 	"agones-minecraft/db"
 	"agones-minecraft/log"
@@ -36,5 +38,7 @@ func main() {
 	r := routers.NewRouter()
 
 	port := config.GetPort()
-	r.Run(":" + port)
+	if err := r.Run(":" + port); err != nil {
+		zap.L().Fatal("error starting server", zap.Error(err))
+	}
 }

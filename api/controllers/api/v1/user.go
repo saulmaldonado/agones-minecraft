@@ -26,7 +26,14 @@ func GetMe(c *gin.Context) {
 	}
 
 	var user userv1Model.User
-	userv1Service.GetUserById(uuid.MustParse(userId), &user)
+	if err := userv1Service.GetUserById(uuid.MustParse(userId), &user); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.Errors = append(c.Errors, errors.NewNotFoundError(err))
+			return
+		}
+		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		return
+	}
 
 	foundUser := userv1Resource.User{
 		ID:             user.ID,

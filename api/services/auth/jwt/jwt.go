@@ -37,26 +37,47 @@ type TokenPair struct {
 func NewTokens(userId string) (*TokenPair, error) {
 	id := uuid.NewString()
 	a := jwt.New()
-	a.Set(jwt.IssuerKey, Issuer)
-	a.Set(jwt.IssuedAtKey, time.Now().Unix())
-	a.Set(jwt.JwtIDKey, id)
-	a.Set(jwt.SubjectKey, userId)
+	if err := a.Set(jwt.IssuerKey, Issuer); err != nil {
+		return nil, err
+	}
+
+	if err := a.Set(jwt.IssuedAtKey, time.Now().Unix()); err != nil {
+		return nil, err
+	}
+
+	if err := a.Set(jwt.JwtIDKey, id); err != nil {
+		return nil, err
+	}
+
+	if err := a.Set(jwt.SubjectKey, userId); err != nil {
+		return nil, err
+	}
 
 	r, err := a.Clone()
 	if err != nil {
 		return nil, err
 	}
 
-	a.Set(RefreshKey, false)
-	r.Set(RefreshKey, true)
+	if err := a.Set(RefreshKey, false); err != nil {
+		return nil, err
+	}
+
+	if err := r.Set(RefreshKey, true); err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 
 	aExp := now.Add(AccessTokenTimeout)
 	rExp := now.Add(RefreshTokenTimeout)
 
-	a.Set(jwt.ExpirationKey, aExp.Unix())
-	r.Set(jwt.ExpirationKey, rExp.Unix())
+	if err := a.Set(jwt.ExpirationKey, aExp.Unix()); err != nil {
+		return nil, err
+	}
+
+	if err := r.Set(jwt.ExpirationKey, rExp.Unix()); err != nil {
+		return nil, err
+	}
 
 	accessTokenKey := config.GetJWTSecret()
 	// TODO: have a different refresh token key
