@@ -30,19 +30,6 @@ module "external_dns" {
   cluster_ca_certificate = module.gke_cluster.cluster_ca_certificate
 }
 
-output "host" {
-  value = module.gke_cluster.host
-}
-
-output "token" {
-  value = module.gke_cluster.token
-  sensitive = true
-}
-
-output "cluster_ca_certificate" {
-  value = module.gke_cluster.cluster_ca_certificate
-}
-
 output "name_servers" {
   description = "name servers for DNS zone"
   value       = module.gke_cluster.name_servers

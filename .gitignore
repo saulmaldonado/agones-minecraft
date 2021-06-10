@@ -8,7 +8,8 @@ build
 
 crash.log
 
-exampl.tfvars
+!*.auto.tfvars
+*.tfvars
 
 override.tf
 override.tf.json
