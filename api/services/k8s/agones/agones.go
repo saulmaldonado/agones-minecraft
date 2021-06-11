@@ -10,71 +10,14 @@ import (
 	v1Informers "agones.dev/agones/pkg/client/informers/externalversions/agones/v1"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	"agones-minecraft/config"
-	worldv1Model "agones-minecraft/models/v1/world"
-	"agones-minecraft/resource/api/v1/game"
+	gamev1Resource "agones-minecraft/resource/api/v1/game"
 	k8s "agones-minecraft/services/k8s"
-)
-
-const (
-	// GameServer labels
-
-	JavaEdition    string = "java"
-	BedrockEdition string = "bedrock"
-
-	// GameServer Spec
-
-	DefaultGenerateName            string = "mc-server-"
-	DefaultGameServerContainerName string = "mc-server"
-	DefaultJavaContainerPort       int32  = 25565
-	DefaultBedrockContainerPort    int32  = 19132
-
-	// Health
-
-	DefaultInitialDelay     int32 = 60
-	DefaultPeriodSeconds    int32 = 12
-	DefaultFailureThreshold int32 = 5
-
-	// Pod Template
-
-	DefaultJavaImage     string = "itzg/minecraft-server"
-	DefaultBedrockImage  string = "saulmaldonado/minecraft-bedrock-server"
-	DefaultRCONPort      int32  = 25575
-	DefaultRCONPassword  string = "minecraft"
-	DefaultDataDirectory string = "/data"
-
-	// mc-monitor
-
-	MCMonitorImageName string = "saulmaldonado/agones-mc"
-
-	// mc-backup
-
-	MCBackupImageName         string = "saulmaldonado/agones-mc"
-	MCBackupDefaultBucketName string = "agones-minecraft-mc-worlds"
-	DefaultMCBackupCron       string = "0 */6 * * *"
-
-	// volumes
-
-	DefaultDataVolumeName string = "world-vol"
-
-	// annotations
-
-	HostnameAnnotation        string = "external-dns.alpha.kubernetes.io/hostname"
-	SRVServiceAnnotation      string = "external-dns.alpha.kubernetes.io/gameserver-service"
-	JavaSRVServiceName        string = "minecraft"
-	CustomSubdomainAnnotation string = "external-dns.alpha.kubernetes.io/gameserver-subdomain"
-
-	// labels
-
-	EditionLabel string = "edition"
-	UserIdLabel  string = "userId"
 )
 
 var agonesClient *AgonesClient
@@ -85,6 +28,9 @@ type AgonesClient struct {
 	informer    v1Informers.GameServerInformer
 	recordStore GameServerDNSRecordStore
 }
+
+// Timeout for connecting to k8s server
+var DefaultTimeout time.Duration = time.Second * 30
 
 // Initializes Agones client
 func Init() {
@@ -97,7 +43,7 @@ func Init() {
 
 	stop := make(chan struct{})
 
-	time.AfterFunc(time.Second*30, func() {
+	time.AfterFunc(DefaultTimeout, func() {
 		close(stop)
 	})
 
@@ -160,294 +106,34 @@ func (c *AgonesClient) Delete(serverName string) error {
 		Delete(context.Background(), serverName, metav1.DeleteOptions{})
 }
 
+func (c *AgonesClient) ListRecords() []string {
+	return c.recordStore.List()
+}
+
 func (c *AgonesClient) HostnameAvailable(domain, subdomain string) bool {
 	hostname := fmt.Sprintf("%s.%s", subdomain, domain)
 	_, ok := c.recordStore.Get(hostname)
 	return !ok
 }
 
-func (c *AgonesClient) ListRecords() []string {
-	return c.recordStore.List()
-}
-
-func GetEdition(gs *agonesv1.GameServer) worldv1Model.Edition {
-	l := gs.GetLabels()
-	return worldv1Model.Edition(l[EditionLabel])
-}
-
-func SetHostname(gs *agonesv1.GameServer, domain, subdomain string) {
-	anno := gs.GetAnnotations()
-	anno[CustomSubdomainAnnotation] = subdomain
-	anno[HostnameAnnotation] = domain
-	gs.SetAnnotations(anno)
-}
-
-func GetDomainName(gs *agonesv1.GameServer) string {
-	return gs.Annotations[HostnameAnnotation]
-}
-
-func GetSubdomain(gs *agonesv1.GameServer) (string, bool) {
-	v, ok := gs.Annotations[CustomSubdomainAnnotation]
-	return v, ok
-}
-
-func GetHostname(gs *agonesv1.GameServer) string {
-	subdomain := gs.Name
-	if domain, ok := gs.Annotations[CustomSubdomainAnnotation]; ok {
-		subdomain = domain
+func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
+	gs, err := Client().Get(name)
+	if err != nil {
+		return err
 	}
-	domain := gs.Annotations[HostnameAnnotation]
-	return fmt.Sprintf("%s.%s", subdomain, domain)
-}
+	hostname := GetHostname(gs)
+	userId := uuid.MustParse(GetUserId(gs))
 
-func GetStatus(gs *agonesv1.GameServer) game.Status {
-	if IsOnline(gs) {
-		return game.Online
-	} else if IsStarting(gs) {
-		return game.Starting
+	*game = gamev1Resource.GameStatus{
+		ID:       GetUID(gs),
+		UserID:   userId,
+		Name:     gs.Name,
+		Status:   GetStatus(gs),
+		Edition:  GetEdition(gs),
+		Hostname: &hostname,
+		Address:  GetAddress(gs),
+		Port:     GetPort(gs),
 	}
-	return game.Stopping
-}
 
-func GetDNSZone() string {
-	return config.GetDNSZone()
-}
-
-func GetUserId(gs *agonesv1.GameServer) string {
-	return gs.Labels[UserIdLabel]
-}
-
-func SetUserId(gs *agonesv1.GameServer, userId uuid.UUID) {
-	gs.Labels[UserIdLabel] = userId.String()
-}
-
-func GetPort(gs *agonesv1.GameServer) int32 {
-	if IsBeforePodCreated(gs) {
-		return 0
-	}
-	return gs.Status.Ports[0].Port
-}
-
-func IsStarting(gs *agonesv1.GameServer) bool {
-	state := gs.Status.State
-	return IsBeforePodCreated(gs) ||
-		state == agonesv1.GameServerStateScheduled ||
-		state == agonesv1.GameServerStateRequestReady
-}
-
-func IsOnline(gs *agonesv1.GameServer) bool {
-	state := gs.Status.State
-	return state == agonesv1.GameServerStateReady || state == agonesv1.GameServerStateAllocated
-}
-
-func IsBeforePodCreated(gs *agonesv1.GameServer) bool {
-	state := gs.Status.State
-	return state == agonesv1.GameServerStatePortAllocation ||
-		state == agonesv1.GameServerStateCreating ||
-		state == agonesv1.GameServerStateStarting
-}
-
-// Initializes a new default Java Minecraft server
-// Agones v1 GameServer object
-func NewJavaServer() *agonesv1.GameServer {
-	return &agonesv1.GameServer{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: DefaultGenerateName,
-			Namespace:    metav1.NamespaceDefault,
-			Annotations: map[string]string{
-				HostnameAnnotation:   GetDNSZone(),
-				SRVServiceAnnotation: JavaSRVServiceName,
-			},
-			Labels: map[string]string{
-				EditionLabel: JavaEdition,
-			},
-		},
-		Spec: agonesv1.GameServerSpec{
-			Container: DefaultGameServerContainerName,
-			Ports: []agonesv1.GameServerPort{{
-				ContainerPort: DefaultJavaContainerPort,
-				Name:          "mc",
-				PortPolicy:    agonesv1.Dynamic,
-				Protocol:      corev1.ProtocolTCP,
-			}},
-			Health: agonesv1.Health{
-				InitialDelaySeconds: DefaultInitialDelay,
-				PeriodSeconds:       DefaultPeriodSeconds,
-				FailureThreshold:    DefaultFailureThreshold,
-			},
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:            DefaultGameServerContainerName,
-							Image:           DefaultJavaImage,
-							ImagePullPolicy: corev1.PullAlways,
-							Env: []corev1.EnvVar{
-								{Name: "EULA", Value: "TRUE"},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{MountPath: DefaultDataDirectory, Name: DefaultDataVolumeName},
-							},
-							Ports: []corev1.ContainerPort{
-								{ContainerPort: 25575},
-							},
-						},
-						{
-							Name:  "mc-monitor",
-							Image: MCMonitorImageName,
-							Args: []string{
-								"monitor",
-								"--attempts=" + fmt.Sprint(DefaultFailureThreshold),
-								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
-								fmt.Sprintf("--interval=%ds", DefaultPeriodSeconds-2),
-								fmt.Sprintf("--timeout=%ds", DefaultPeriodSeconds-2),
-							},
-							ImagePullPolicy: corev1.PullAlways,
-						},
-						{
-							Name:  "mc-backup",
-							Image: MCMonitorImageName,
-							Args: []string{
-								"backup",
-								"--gcp-bucket-name=" + MCBackupDefaultBucketName,
-								"--backup-cron=" + DefaultMCBackupCron,
-								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
-							},
-							Env: []corev1.EnvVar{
-								{
-									Name: "NAME", ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{
-											FieldPath: "metadata.name",
-										},
-									},
-								},
-								{
-									Name:  "RCON_PASSWORD",
-									Value: DefaultRCONPassword,
-								},
-							},
-							ImagePullPolicy: corev1.PullAlways,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									MountPath: DefaultDataDirectory,
-									Name:      DefaultDataVolumeName,
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: DefaultDataVolumeName,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func NewBedrockServer() *agonesv1.GameServer {
-	return &agonesv1.GameServer{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: DefaultGenerateName,
-			Namespace:    metav1.NamespaceDefault,
-			Annotations: map[string]string{
-				HostnameAnnotation:   GetDNSZone(),
-				SRVServiceAnnotation: JavaSRVServiceName,
-			},
-			Labels: map[string]string{
-				EditionLabel: BedrockEdition,
-			},
-		},
-		Spec: agonesv1.GameServerSpec{
-			Container: DefaultGameServerContainerName,
-			Ports: []agonesv1.GameServerPort{{
-				ContainerPort: DefaultBedrockContainerPort,
-				Name:          "mc",
-				PortPolicy:    agonesv1.Dynamic,
-				Protocol:      corev1.ProtocolUDP,
-			}},
-			Health: agonesv1.Health{
-				InitialDelaySeconds: DefaultInitialDelay,
-				PeriodSeconds:       DefaultPeriodSeconds,
-				FailureThreshold:    DefaultFailureThreshold,
-			},
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:            DefaultGameServerContainerName,
-							Image:           DefaultBedrockImage,
-							ImagePullPolicy: corev1.PullAlways,
-							Env: []corev1.EnvVar{
-								{Name: "EULA", Value: "TRUE"},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{MountPath: DefaultDataDirectory, Name: DefaultDataVolumeName},
-							},
-							Ports: []corev1.ContainerPort{
-								{ContainerPort: 25575},
-							},
-						},
-						{
-							Name:  "mc-monitor",
-							Image: MCMonitorImageName,
-							Args: []string{
-								"monitor",
-								"--attempts=" + fmt.Sprint(DefaultFailureThreshold),
-								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
-								fmt.Sprintf("--interval=%ds", DefaultPeriodSeconds-2),
-								fmt.Sprintf("--timeout=%ds", DefaultPeriodSeconds-2),
-								"--port=" + fmt.Sprint(DefaultBedrockContainerPort),
-								"--edition=" + BedrockEdition,
-							},
-							ImagePullPolicy: corev1.PullAlways,
-						},
-						{
-							Name:  "mc-backup",
-							Image: MCMonitorImageName,
-							Args: []string{
-								"backup",
-								"--gcp-bucket-name=" + MCBackupDefaultBucketName,
-								"--backup-cron=" + DefaultMCBackupCron,
-								fmt.Sprintf("--initial-delay=%ds", DefaultInitialDelay),
-								"--edition=" + BedrockEdition,
-							},
-							Env: []corev1.EnvVar{
-								{
-									Name: "NAME", ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{
-											FieldPath: "metadata.name",
-										},
-									},
-								},
-								{
-									Name:  "RCON_PASSWORD",
-									Value: DefaultRCONPassword,
-								},
-							},
-							ImagePullPolicy: corev1.PullAlways,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									MountPath: DefaultDataDirectory,
-									Name:      DefaultDataVolumeName,
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: DefaultDataVolumeName,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	return nil
 }

@@ -1,2 +1,3 @@
 .env
 kubeconfig.yml
+*.errors

@@ -33,6 +33,7 @@ type Game struct {
 
 type GameStatus struct {
 	ID       uuid.UUID           `json:"id"`
+	UserID   uuid.UUID           `json:"-"`
 	Name     string              `json:"name"`
 	Status   Status              `json:"status"`
 	Edition  gamev1Model.Edition `json:"edition"`

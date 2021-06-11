@@ -17,14 +17,14 @@ import (
 
 func main() {
 	// Load environment variables and .env config
-	config.LoadConfig()
+	config.InitConfig()
 	// Sets global zap logger
 	log.Init()
 	// Initializes k8s cluster config
 	k8s.InitConfig()
-	// Initializes agones client and informer
+	// Connects to k8s cluster and initializes agones client and informer
 	agones.Init()
-	// Initializes cookie store
+	// Initializes authentication cookie store
 	sessions.Init()
 	// Initializes database connections and migrates (in development)
 	db.Init()

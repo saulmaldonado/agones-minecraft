@@ -9,5 +9,5 @@ import (
 )
 
 func Sessions() gin.HandlerFunc {
-	return s.Sessions(sessionsSvc.SessionName, sessionsSvc.Store)
+	return s.Sessions(sessionsSvc.SessionNamev1, sessionsSvc.Store)
 }

@@ -3,7 +3,6 @@
 package log
 
 import (
-	"agones-minecraft/resource/api/v1/errors"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -39,13 +38,8 @@ func Ginzap(logger *zap.Logger, timeFormat string, utc bool) gin.HandlerFunc {
 		}
 
 		if len(c.Errors) > 0 {
-			err := c.Errors.Last()
-			if e, ok := err.Err.(*errors.APIError); ok {
-				if e.Err != nil {
-					logger.Error(e.Err.Error())
-				}
-			} else {
-				logger.Error(e.Err.Error())
+			for _, err := range c.Errors {
+				logger.Error(err.Error())
 			}
 		}
 

@@ -1,13 +1,14 @@
 package jwt
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/jwt"
 
-	"agones-minecraft/resource/api/v1/errors"
+	v1Err "agones-minecraft/errors/v1"
+	apiErr "agones-minecraft/resource/api/v1/errors"
 	jwtService "agones-minecraft/services/auth/jwt"
 )
 
@@ -15,6 +16,14 @@ const (
 	HeaderKey  string = "Authorization"
 	ContextKey string = "JWT_SUBJECT"
 	TokenIDKey string = "JWT_ID"
+)
+
+var (
+	ErrMissingAccessToken        error = errors.New("missing access token in Authorization header")
+	ErrAccessTokenParsing        error = errors.New("unable to parse token")
+	ErrAccessTokenExpected       error = errors.New("token identified as access token expected access token")
+	ErrInvalidAccessToken        error = errors.New("invalid access token")
+	ErrUnableToVerifyAccessToken error = errors.New("unable to verify access token")
 )
 
 // returns middleware that will parse JWT token in Authorization header, validate it, verify it
@@ -27,7 +36,18 @@ func Authorizer() gin.HandlerFunc {
 
 		token, err := authenticateWithToken(tokenString)
 		if err != nil {
-			c.Errors = append(c.Errors, errors.NewUnauthorizedError(err))
+			switch err {
+			case ErrMissingAccessToken:
+				c.Error(apiErr.NewUnauthorizedError(ErrMissingAccessToken, v1Err.ErrMissingAccessToken))
+			case ErrAccessTokenParsing:
+				c.Error(apiErr.NewBadRequestError(ErrAccessTokenParsing, v1Err.ErrAccessTokenParsing))
+			case ErrAccessTokenExpected:
+				c.Error(apiErr.NewBadRequestError(ErrAccessTokenExpected, v1Err.ErrAccessTokenExpected))
+			case ErrInvalidAccessToken:
+				c.Error(apiErr.NewUnauthorizedError(ErrInvalidAccessToken, v1Err.ErrInvalidAccessToken))
+			case ErrUnableToVerifyAccessToken:
+				c.Error(apiErr.NewUnauthorizedError(ErrUnableToVerifyAccessToken, v1Err.ErrUnableToVerifyAccessToken))
+			}
 			c.Abort()
 			return
 		}
@@ -64,26 +84,27 @@ func Authenticator() gin.HandlerFunc {
 
 func authenticateWithToken(tokenString string) (jwt.Token, error) {
 	if tokenString == "" {
-		return nil, fmt.Errorf("missing access token in Authorization header")
+
+		return nil, ErrMissingAccessToken
 	}
 
 	token, err := jwtService.ParseToken(tokenString)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse token")
+		return nil, ErrAccessTokenParsing
 	}
 
 	val, _ := token.Get(jwtService.RefreshKey)
 
 	if val.(bool) {
-		return nil, fmt.Errorf("token identified as refresh token")
+		return nil, ErrAccessTokenExpected
 	}
 
 	if err := jwtService.ValidateToken(token); err != nil {
-		return nil, fmt.Errorf("invalid access token")
+		return nil, ErrInvalidAccessToken
 	}
 
 	if err := jwtService.VerifyAccessToken(tokenString); err != nil {
-		return nil, fmt.Errorf("unable to verify access token")
+		return nil, ErrUnableToVerifyAccessToken
 	}
 	return token, nil
 }

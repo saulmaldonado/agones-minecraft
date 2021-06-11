@@ -1,7 +1,9 @@
 package errors
 
 import (
-	"agones-minecraft/resource/api/v1/errors"
+	v1Err "agones-minecraft/errors/v1"
+	apiErr "agones-minecraft/resource/api/v1/errors"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -9,11 +11,23 @@ import (
 func HandleErrors() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
+		var errors []interface{}
+		var statusCode int
 
-		if err := c.Errors.Last(); err != nil {
-			if e, ok := err.Err.(*errors.APIError); ok {
-				c.JSON(e.StatusCode, e)
+		for _, err := range c.Errors {
+			if e, ok := err.Meta.(*apiErr.APIError); ok {
+				errors = append(errors, e)
+				statusCode = e.HTTPCode()
+			} else {
+				e := apiErr.NewInternalServerError(err, v1Err.ErrUnknownID)
+				errors = append(errors, e.Meta)
+				statusCode = http.StatusInternalServerError
 			}
 		}
+
+		if len(errors) > 0 {
+			c.JSON(statusCode, errors)
+		}
+
 	}
 }

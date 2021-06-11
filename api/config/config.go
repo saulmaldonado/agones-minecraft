@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// env variables
 const (
 	ENV                  = "ENV"
 	PORT                 = "PORT"
@@ -22,29 +23,57 @@ const (
 	REDIS_PASSWORD       = "REDIS_PASSWORD"
 	JWT_SECRET           = "JWT_SECRET"
 	DNS_ZONE             = "DNS_ZONE"
+)
 
-	Production  = "production"
-	Development = "development"
+const (
+	Production  environment = "production"
+	Development environment = "development"
 )
 
 // Loads App config from .env file and environment variables with the latter taking precedence
-func LoadConfig() {
+func InitConfig() {
 	viper.AutomaticEnv()
 	viper.SetConfigFile(".env")
-	viper.SetDefault(ENV, Development)
-	viper.SetDefault(PORT, "8080")
+
+	viper.SetDefault(ENV, Development) // default to development
+	viper.SetDefault(PORT, "8080")     // default to 8080
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Fatal(err)
 		}
 	}
-
 }
 
-// Returns ENV from config
-func GetEnv() string {
-	return viper.GetString(ENV)
+type environment string
+
+type DBConfig struct {
+	Password string
+	Hostname string
+	Port     string
+	Name     string
+	User     string
+}
+
+func GetDBConfig() *DBConfig {
+	return &DBConfig{
+		Password: viper.GetString(DB_PASSWORD),
+		Hostname: viper.GetString(DB_HOST),
+		Port:     viper.GetString(PORT),
+		Name:     viper.GetString(DB_NAME),
+		User:     viper.GetString(DB_USER),
+	}
+}
+
+// Returns current environment
+func GetEnv() environment {
+	v := viper.GetString(ENV)
+
+	if v != string(Development) && v != string(Production) {
+		log.Fatal("invalid ENV value")
+	}
+
+	return environment(v)
 }
 
 // Returns PORT from config
@@ -52,15 +81,7 @@ func GetPort() string {
 	return viper.GetString(PORT)
 }
 
-// Returns DB_USER, DB_PASSWORD, DB_HOST, DB_PORT and DB_NAME from config
-func GetDB() (string, string, string, string, string) {
-	return viper.GetString(DB_USER),
-		viper.GetString(DB_PASSWORD),
-		viper.GetString(DB_HOST),
-		viper.GetString(DB_PORT),
-		viper.GetString(DB_NAME)
-}
-
+// Returns secret for sessions
 func GetSessionSecret() (authKey []byte, encKey []byte) {
 	keys := viper.GetStringSlice(SESSION_SECRET)
 	if len(keys) < 2 {
@@ -71,18 +92,42 @@ func GetSessionSecret() (authKey []byte, encKey []byte) {
 	return
 }
 
-func GetTwichCreds() (clientId string, clientSecret string, redirect string) {
-	return viper.GetString(TWITCH_CLIENT_ID), viper.GetString(TWITCH_CLIENT_SECRET), viper.GetString(TWITCH_REDIRECT)
+// ID, secret and current redirect for Twitch
+type TwitchConfig struct {
+	ClientID     string
+	ClientSecret string
+	Redirect     string
 }
 
+// Returns Twitch configuration
+func GetTwichCreds() *TwitchConfig {
+	return &TwitchConfig{
+		ClientID:     viper.GetString(TWITCH_CLIENT_ID),
+		ClientSecret: viper.GetString(TWITCH_CLIENT_SECRET),
+		Redirect:     viper.GetString(TWITCH_REDIRECT),
+	}
+}
+
+// Returns JWT HS256 secret
 func GetJWTSecret() string {
 	return viper.GetString(JWT_SECRET)
 }
 
-func GetRedisCreds() (address string, password string) {
-	return viper.GetString(REDIS_ADDRESS), viper.GetString(REDIS_PASSWORD)
+// Redis address and password
+type RedisConfig struct {
+	Address  string
+	Password string
 }
 
+// Returns redis configuration
+func GetRedisCreds() *RedisConfig {
+	return &RedisConfig{
+		Address:  viper.GetString(REDIS_ADDRESS),
+		Password: viper.GetString(REDIS_PASSWORD),
+	}
+}
+
+// Returns DNS zone
 func GetDNSZone() string {
 	return viper.GetString(DNS_ZONE)
 }

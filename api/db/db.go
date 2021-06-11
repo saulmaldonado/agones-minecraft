@@ -33,9 +33,15 @@ func Init() {
 		logger.LogLevel = gormlogger.Info
 	}
 
-	user, pw, host, port, name := config.GetDB()
+	dbconfig := config.GetDBConfig()
 
-	dsn := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, pw, host, port, name)
+	dsn := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s",
+		dbconfig.User,
+		dbconfig.Password,
+		dbconfig.Hostname,
+		dbconfig.Port,
+		dbconfig.Name,
+	)
 
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger})
 	if err != nil {
@@ -43,7 +49,11 @@ func Init() {
 	}
 
 	if config.GetEnv() == config.Development {
-		if err = db.AutoMigrate(&userv1Model.User{}, &twitchv1Model.TwitchToken{}, &gamev1Model.Game{}); err != nil {
+		if err = db.AutoMigrate(
+			&userv1Model.User{},
+			&twitchv1Model.TwitchToken{},
+			&gamev1Model.Game{},
+		); err != nil {
 			zap.L().Fatal("error auto-migrating db", zap.Error(err))
 		}
 	}

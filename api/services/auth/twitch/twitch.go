@@ -41,20 +41,28 @@ type UserInfo struct {
 	Username string `json:"preferred_username"`
 }
 
-var ErrInvalidAccessToken error = errors.New("invalid twitch access token for user")
-var ErrInvalidatedTokens error = errors.New("twitch credentials are invalid. login again to renew credentials and tokens")
+var (
+	ErrInvalidAccessToken       error = errors.New("invalid twitch access token for user")
+	ErrTwitchCredentialsInvalid error = errors.New("user's Twitch credentials have been invalidated. login to renew credentials")
+	ErrMissingIDToken           error = errors.New("id_token not included in token")
+)
 
 var TwitchOIDCProvider *oidc.Provider
 
 func NewTwitchConfig(provider *oidc.Provider, scopes ...string) *oauth2.Config {
-	id, sec, re := config.GetTwichCreds()
+	creds := config.GetTwichCreds()
 	return &oauth2.Config{
-		ClientID:     id,
-		ClientSecret: sec,
+		ClientID:     creds.ClientID,
+		ClientSecret: creds.ClientSecret,
 		Endpoint:     provider.Endpoint(),
-		RedirectURL:  re,
+		RedirectURL:  creds.Redirect,
 		Scopes:       scopes,
 	}
+}
+
+func NewToken(code string) (*oauth2.Token, error) {
+	config := NewTwitchConfig(TwitchOIDCProvider)
+	return config.Exchange(context.Background(), code)
 }
 
 func Init() {
@@ -110,27 +118,21 @@ func GetUserInfo(token string, userInfo *UserInfo) error {
 
 func VerifyToken(clientId, rawIDToken string) (idToken *oidc.IDToken, err error) {
 	verifier := NewOIDCVerifier(TwitchOIDCProvider, clientId)
-
-	idToken, err = verifier.Verify(context.Background(), rawIDToken)
-	if err != nil {
-		return nil, err
-	}
-	return idToken, err
+	return verifier.Verify(context.Background(), rawIDToken)
 }
 
 func GetClaimsFromToken(idToken *oidc.IDToken, claims *Claims) error {
-	if err := idToken.Claims(&claims); err != nil {
-		return err
-	}
-	return nil
+	return idToken.Claims(&claims)
 }
 
-func GetPayload(token *oauth2.Token, clientId string) (*Payload, error) {
+func GetPayload(token *oauth2.Token) (*Payload, error) {
 	rawIDToken, ok := token.Extra("id_token").(string)
 
 	if !ok {
-		return nil, fmt.Errorf("id_token not included in token")
+		return nil, ErrMissingIDToken
 	}
+
+	clientId := config.GetTwichCreds().ClientID
 
 	idToken, err := VerifyToken(clientId, rawIDToken)
 	if err != nil {
@@ -139,7 +141,7 @@ func GetPayload(token *oauth2.Token, clientId string) (*Payload, error) {
 
 	var claims Claims
 
-	if err := GetClaimsFromToken(idToken, &claims); err != nil {
+	if err := idToken.Claims(&claims); err != nil {
 		return nil, err
 	}
 
@@ -210,7 +212,7 @@ func Refresh(refreshToken, clientId, clientSecret string) (*oauth2.Token, error)
 	defer res.Body.Close()
 
 	if res.StatusCode == 401 || res.StatusCode == 400 {
-		return nil, ErrInvalidatedTokens
+		return nil, ErrTwitchCredentialsInvalid
 	}
 
 	var tokens oauth2.Token

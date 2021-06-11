@@ -1,80 +1,111 @@
 package errors
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+
+	v1Err "agones-minecraft/errors/v1"
 )
 
 const (
-	InternalServerErrorMsg = "Internal server error. Please try again. Report if the problem presists."
+	InternalServerErrorMsg = "internal server error. try again later. report if problem presists"
 )
 
 type APIError struct {
-	Err          error  `json:"-"`
-	ErrorMessage string `json:"errorMessage"`
-	StatusCode   int    `json:"statusCode"`
+	Message     string        `json:"message"`
+	StatusCode  int           `json:"statusCode"`
+	ReferenceID v1Err.ErrorID `json:"referenceId"`
 }
 
 func (e *APIError) Error() string {
-	return e.ErrorMessage
+	return e.Message
 }
 
 func (e *APIError) HTTPCode() int {
 	return e.StatusCode
 }
 
-func NewInternalServerError(err error) *gin.Error {
+func NewInternalServerError(err error, id v1Err.ErrorID) *gin.Error {
 	return &gin.Error{
-		Err: &APIError{
-			Err:          err,
-			ErrorMessage: InternalServerErrorMsg,
-			StatusCode:   http.StatusInternalServerError,
+		Err:  err,
+		Type: gin.ErrorTypePrivate,
+		Meta: &APIError{
+			Message:     InternalServerErrorMsg,
+			StatusCode:  http.StatusInternalServerError,
+			ReferenceID: id,
 		},
-		Type: gin.ErrorTypeAny,
 	}
 }
 
-func NewBadRequestError(err error) *gin.Error {
+func NewBadRequestError(err error, id v1Err.ErrorID) *gin.Error {
 	return &gin.Error{
-		Err: &APIError{
-			Err:          nil,
-			ErrorMessage: err.Error(),
-			StatusCode:   http.StatusBadRequest,
+		Err:  err,
+		Type: gin.ErrorTypePublic,
+		Meta: &APIError{
+			Message:     err.Error(),
+			StatusCode:  http.StatusBadRequest,
+			ReferenceID: id,
 		},
-		Type: gin.ErrorTypeAny,
 	}
 }
 
-func NewUnauthorizedError(err error) *gin.Error {
+func NewUnauthorizedError(err error, id v1Err.ErrorID) *gin.Error {
 	return &gin.Error{
-		Err: &APIError{
-			Err:          nil,
-			ErrorMessage: err.Error(),
-			StatusCode:   http.StatusUnauthorized,
+		Err:  err,
+		Type: gin.ErrorTypePublic,
+		Meta: &APIError{
+			Message:     err.Error(),
+			StatusCode:  http.StatusUnauthorized,
+			ReferenceID: id,
 		},
-		Type: gin.ErrorTypeAny,
 	}
 }
 
-func NewNotFoundError(err error) *gin.Error {
+func NewNotFoundError(err error, id v1Err.ErrorID) *gin.Error {
 	return &gin.Error{
-		Err: &APIError{
-			Err:          nil,
-			ErrorMessage: err.Error(),
-			StatusCode:   http.StatusNotFound,
+		Err:  err,
+		Type: gin.ErrorTypePublic,
+		Meta: &APIError{
+			Message:     err.Error(),
+			StatusCode:  http.StatusNotFound,
+			ReferenceID: id,
 		},
-		Type: gin.ErrorTypeAny,
 	}
 }
 
-func NewGoneError(err error) *gin.Error {
+func NewGoneError(err error, id v1Err.ErrorID) *gin.Error {
 	return &gin.Error{
-		Err: &APIError{
-			Err:          nil,
-			ErrorMessage: err.Error(),
-			StatusCode:   http.StatusGone,
+		Err:  err,
+		Type: gin.ErrorTypePublic,
+		Meta: &APIError{
+			Message:     err.Error(),
+			StatusCode:  http.StatusGone,
+			ReferenceID: id,
 		},
-		Type: gin.ErrorTypeAny,
 	}
+}
+
+func NewValidationError(verrs validator.ValidationErrors, id v1Err.ErrorID) []*gin.Error {
+	var errs []*gin.Error
+
+	for _, verr := range verrs {
+		errMsg := verr.ActualTag()
+		if verr.Param() != "" {
+			errMsg = fmt.Sprintf("%s=%s", errMsg, verr.Param())
+		}
+
+		err := errors.New(errMsg)
+
+		errs = append(errs,
+			&gin.Error{
+				Err:  err,
+				Type: gin.ErrorTypeBind,
+				Meta: &APIError{Message: err.Error(), StatusCode: http.StatusBadRequest, ReferenceID: id}},
+		)
+	}
+	return errs
 }

@@ -1,6 +1,7 @@
 package user
 
 import (
+	"reflect"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,4 +34,11 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 
 	u.ID = id
 	return nil
+}
+
+func (u *User) HasChanged(c *User) bool {
+	return reflect.DeepEqual(u.Email, c.Email) &&
+		reflect.DeepEqual(u.EmailVerified, c.EmailVerified) &&
+		reflect.DeepEqual(u.TwitchUsername, c.TwitchUsername) &&
+		reflect.DeepEqual(u.TwitchPicture, c.TwitchPicture)
 }

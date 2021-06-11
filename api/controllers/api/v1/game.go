@@ -1,27 +1,33 @@
 package v1Controllers
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
+	v1Err "agones-minecraft/errors/v1"
 	"agones-minecraft/middleware/jwt"
 	gamev1Model "agones-minecraft/models/v1/game"
-	"agones-minecraft/resource/api/v1/errors"
+	apiErr "agones-minecraft/resource/api/v1/errors"
 	gamev1Resource "agones-minecraft/resource/api/v1/game"
 	gamev1Service "agones-minecraft/services/api/v1/game"
 	"agones-minecraft/services/k8s/agones"
 )
 
+var (
+	ErrGameNotFound error = errors.New("game server not found")
+)
+
 func ListGames(c *gin.Context) {
 	gameServers, err := agones.Client().List()
 	if err != nil {
-		c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrListingGames))
 		return
 	}
 	c.JSON(http.StatusOK, gameServers)
@@ -31,7 +37,11 @@ func GetGame(c *gin.Context) {
 	name := c.Param("name")
 	gameServer, err := agones.Client().Get(name)
 	if err != nil {
-		c.Errors = append(c.Errors, errors.NewNotFoundError(fmt.Errorf("server %s not found", name)))
+		if k8sErrors.IsNotFound(err) {
+			c.Error(apiErr.NewNotFoundError(ErrGameNotFound, v1Err.ErrGameNotFound))
+		} else {
+			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingGameServer))
+		}
 		return
 	}
 	c.JSON(http.StatusOK, gameServer)
@@ -39,45 +49,37 @@ func GetGame(c *gin.Context) {
 
 func GetGameState(c *gin.Context) {
 	name := c.Param("name")
-	game := gamev1Resource.GameStatus{
-		Name: name,
-	}
 
-	if gs, err := agones.Client().Get(name); err != nil {
-		var foundGame gamev1Model.Game
+	var game gamev1Resource.GameStatus
+
+	if err := agones.GetGameStatusByName(&game, name); err != nil {
 		if k8sErrors.IsNotFound(err) {
-			if err := gamev1Service.GetGameByName(&foundGame, name); err != nil {
+			if err := gamev1Service.GetGameStatusByName(&game, name); err != nil {
 				if err == gorm.ErrRecordNotFound {
-					c.Errors = append(c.Errors, errors.NewNotFoundError(fmt.Errorf("game server not found")))
-					return
+					c.Error(apiErr.NewNotFoundError(ErrGameNotFound, v1Err.ErrGameNotFound))
 				} else {
-					c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+					c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingGameServerFromDB))
 				}
+				return
 			}
-			game.ID = foundGame.ID
-			game.Status = gamev1Resource.Offline
-			game.Edition = foundGame.Edition
 		} else {
-			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingGameServer))
 			return
 		}
 	} else {
-		game.Edition = agones.GetEdition(gs)
-		game.ID = uuid.MustParse(string(gs.UID))
-		game.Status = agones.GetStatus(gs)
-
-		if v, ok := c.Get(jwt.ContextKey); ok {
+		v, ok := c.Get(jwt.ContextKey)
+		if ok {
 			userId := v.(string)
-			if userId == agones.GetUserId(gs) && !agones.IsBeforePodCreated(gs) {
-				port := agones.GetPort(gs)
-
-				host := agones.GetHostname(gs)
-				game.Hostname = &host
-				game.Address = &gs.Status.Address
-				game.Port = &port
+			if userId == game.UserID.String() {
+				c.JSON(http.StatusOK, game)
+				return
 			}
 		}
 	}
+
+	game.Address = nil
+	game.Hostname = nil
+	game.Port = nil
 
 	c.JSON(http.StatusOK, game)
 }
@@ -88,7 +90,12 @@ func CreateJava(c *gin.Context) {
 
 	var body gamev1Resource.CreateGameBody
 	if err := c.ShouldBindJSON(&body); err != nil && err != io.EOF {
-		c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+		var verrs validator.ValidationErrors
+		if errors.As(err, &verrs) {
+			c.Errors = append(c.Errors, apiErr.NewValidationError(verrs, v1Err.ErrCreateGameServerValidation)...)
+		} else {
+			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrMalformedJSON))
+		}
 		return
 	}
 
@@ -102,9 +109,9 @@ func CreateJava(c *gin.Context) {
 
 	if err := gamev1Service.CreateGame(&game, gs); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
-			c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrSubdomainTaken))
 		} else {
-			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrCreatingGame))
 		}
 		return
 	}
@@ -128,7 +135,12 @@ func CreateBedrock(c *gin.Context) {
 
 	var body gamev1Resource.CreateGameBody
 	if err := c.ShouldBindJSON(&body); err != nil && err != io.EOF {
-		c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+		var verrs validator.ValidationErrors
+		if errors.As(err, &verrs) {
+			c.Errors = append(c.Errors, apiErr.NewValidationError(verrs, v1Err.ErrCreateGameServerValidation)...)
+		} else {
+			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrMalformedJSON))
+		}
 		return
 	}
 
@@ -142,13 +154,12 @@ func CreateBedrock(c *gin.Context) {
 
 	if err := gamev1Service.CreateGame(&game, gs); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
-			c.Errors = append(c.Errors, errors.NewBadRequestError(err))
+			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrSubdomainTaken))
 		} else {
-			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrCreatingGame))
 		}
 		return
 	}
-
 	createdGame := gamev1Resource.Game{
 		ID:        game.ID,
 		UserID:    game.UserID,
@@ -172,9 +183,14 @@ func DeleteGame(c *gin.Context) {
 
 	if err := gamev1Service.DeleteGame(&game, userId, name); err != nil {
 		if err == gamev1Service.ErrGameServerNotFound {
-			c.Errors = append(c.Errors, errors.NewNotFoundError(err))
+			c.Error(apiErr.NewNotFoundError(err, v1Err.ErrGameNotFound))
 		} else {
-			c.Errors = append(c.Errors, errors.NewInternalServerError(err))
+			switch err.(type) {
+			case *gamev1Service.ErrDeletingGameFromDb:
+				c.Error(apiErr.NewInternalServerError(err, v1Err.ErrDeletingGameFromDB))
+			case *gamev1Service.ErrDeletingGameFromK8s:
+				c.Error(apiErr.NewInternalServerError(err, v1Err.ErrDeletingGameFromK8s))
+			}
 		}
 		return
 	}

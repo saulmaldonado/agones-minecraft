@@ -35,10 +35,10 @@ func Init() {
 
 // Creates and returns a new JWT store client
 func New() JWTStore {
-	addr, pass := config.GetRedisCreds()
+	c := config.GetRedisCreds()
 	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: pass,
+		Addr:     c.Address,
+		Password: c.Password,
 	})
 	return &RedisStore{client}
 }

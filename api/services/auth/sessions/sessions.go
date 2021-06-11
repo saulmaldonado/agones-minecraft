@@ -3,22 +3,32 @@ package sessions
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
+	"errors"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
-	"golang.org/x/oauth2"
 
 	"agones-minecraft/config"
 )
 
 const (
-	SessionName      = "agones-minecraft-api"
+	SessionNamev1    = "agones-minecraft-api-v1"
 	StateCallbackKey = "state-callback"
 	TokenKey         = "token"
 )
+
+var (
+	ErrMissingState          = errors.New("missing state from request")
+	ErrMissingStateChallenge = errors.New("missing state from cookie")
+	ErrFailedStateChallenge  = errors.New("failed state challenge")
+)
+
+type SessionService interface {
+	NewState() (string, error)
+	AddStateCookie(c *gin.Context, state string) error
+	VerifyStateCookie(c *gin.Context) (bool, error)
+}
 
 var Store cookie.Store
 
@@ -58,28 +68,24 @@ func AddStateFlash(c *gin.Context, state string) error {
 func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
 	sess := sessions.Default(c)
 
+	var err error
+
 	stateChallenge := sess.Flashes(StateCallbackKey)
-	if err := sess.Save(); err != nil {
-		zap.L().Warn("error saving session", zap.Error(err))
+	if e := sess.Save(); e != nil {
+		err = e
 	}
 
 	if state == "" {
-		return false, fmt.Errorf("missing state. try logging in again")
+		return false, ErrMissingState
 	}
 
 	if len(stateChallenge) < 1 {
-		return false, fmt.Errorf("missing state challenge. try logging in again")
+		return false, ErrMissingStateChallenge
 	}
 
 	if state != stateChallenge[0] {
-		return false, fmt.Errorf("failed state challenge. try logging in again")
+		return false, ErrFailedStateChallenge
 	}
 
-	return true, nil
-}
-
-func AddToken(c *gin.Context, tk *oauth2.Token) error {
-	sess := sessions.Default(c)
-	sess.Set(TokenKey, tk)
-	return sess.Save()
+	return true, err
 }

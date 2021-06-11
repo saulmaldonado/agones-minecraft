@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	gamev1Model "agones-minecraft/models/v1/game"
+	gamev1Resource "agones-minecraft/resource/api/v1/game"
 	"agones-minecraft/services/k8s/agones"
 )
 
@@ -24,6 +25,22 @@ func GetGameById(game *gamev1Model.Game, ID uuid.UUID) error {
 
 func GetGameByName(game *gamev1Model.Game, name string) error {
 	return db.DB().Where("name = ?", name).First(game).Error
+}
+
+func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
+	var foundGame gamev1Model.Game
+	if err := GetGameByName(&foundGame, name); err != nil {
+		return err
+	}
+
+	*game = gamev1Resource.GameStatus{
+		ID:      foundGame.ID,
+		Name:    foundGame.Name,
+		Status:  gamev1Resource.Offline,
+		Edition: foundGame.Edition,
+	}
+
+	return nil
 }
 
 func GetGameByUserIdAndName(game *gamev1Model.Game, userId uuid.UUID, name string) error {
@@ -63,21 +80,29 @@ func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
 	})
 }
 
+type ErrDeletingGameFromK8s struct {
+	error
+}
+
+type ErrDeletingGameFromDb struct {
+	error
+}
+
 func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {
 	return db.DB().Transaction(func(tx *gorm.DB) error {
 		if err := GetGameByUserIdAndName(game, userId, name); err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return ErrGameServerNotFound
 			}
-			return err
+			return &ErrDeletingGameFromDb{err}
 		}
 
 		if err := db.DB().Delete(game).Error; err != nil {
-			return err
+			return &ErrDeletingGameFromDb{err}
 		}
 
 		if err := agones.Client().Delete(name); err != nil {
-			return err
+			return &ErrDeletingGameFromK8s{err}
 		}
 
 		return nil
