@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:13.3-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
+  pgweb:
+    image: sosedoff/pgweb
+    ports:
+      - "127.0.0.1:8081:8081"
+  redis:
+    image: redis:alpine
+    ports:
+      - "127.0.0.1:6379:6379"

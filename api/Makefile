@@ -11,6 +11,12 @@ ARCH ?= amd64
 
 .PHONY: build
 
+up:
+	docker-compose up -d
+
+cleanup:
+	docker-compose rm -fsv
+
 install:
 	go mod download
 
