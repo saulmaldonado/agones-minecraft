@@ -6,8 +6,8 @@ VERSION := $(shell set -o pipefail; git describe --exact-match --tags HEAD 2> /d
 BUILD_FLAGS ?= -v
 ARCH ?= amd64
 
- -include .env
- export
+-include .env
+export
 
 .PHONY: build
 
