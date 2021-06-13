@@ -59,7 +59,7 @@ func GetDBConfig() *DBConfig {
 	return &DBConfig{
 		Password: viper.GetString(DB_PASSWORD),
 		Hostname: viper.GetString(DB_HOST),
-		Port:     viper.GetString(PORT),
+		Port:     viper.GetString(DB_PORT),
 		Name:     viper.GetString(DB_NAME),
 		User:     viper.GetString(DB_USER),
 	}
