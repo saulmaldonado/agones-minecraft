@@ -26,7 +26,9 @@ func HandleErrors() gin.HandlerFunc {
 		}
 
 		if len(errors) > 0 {
-			c.JSON(statusCode, errors)
+			c.JSON(statusCode, gin.H{
+				"errors": errors,
+			})
 		}
 
 	}
