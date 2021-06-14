@@ -67,11 +67,11 @@ func EditUser(user *userv1Model.User) error {
 
 func updateUserIfChanged(tx *gorm.DB, user *userv1Model.User, foundUser *userv1Model.User) error {
 	if user.HasChanged(foundUser) {
-		return tx.Model(&foundUser).Omit(clause.Associations).Updates(user).Error
+		return tx.Model(&foundUser).Updates(user).Error
 	}
 	return ErrUserRecordNotChanged
 }
 
 func updateLastLogin(tx *gorm.DB, user *userv1Model.User, lastLogin time.Time) error {
-	return tx.Model(user).Omit("updated_at").Update("last_login", lastLogin).Error
+	return tx.Model(user).Omit(clause.Associations, "updated_at").Update("last_login", lastLogin).Error
 }

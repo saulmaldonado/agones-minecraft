@@ -16,7 +16,7 @@ func GetUserTwitchTokens(userId uuid.UUID, twitchToken *twitchv1Model.TwitchToke
 }
 
 func UpdateUserTwitchTokens(userId uuid.UUID, twitchToken *twitchv1Model.TwitchToken) error {
-	return db.DB().Where("user_id = ?", userId).Updates(twitchToken).Error
+	return db.DB().Model(twitchv1Model.TwitchToken{}).Where("user_id = ?", userId).Updates(twitchToken).Error
 }
 
 func RevokeTwitchTokensForUser(userId uuid.UUID) error {
