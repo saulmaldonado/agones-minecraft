@@ -2,8 +2,13 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -21,6 +26,34 @@ const (
 )
 
 var db *gorm.DB
+
+func New() *bun.DB {
+	dbconfig := config.GetDBConfig()
+
+	dsn := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
+		dbconfig.User,
+		dbconfig.Password,
+		dbconfig.Hostname,
+		dbconfig.Port,
+		dbconfig.Name,
+	)
+
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		panic(err)
+	}
+
+	// disable prepared statements
+	config.PreferSimpleProtocol = true
+
+	sqldb := stdlib.OpenDB(*config)
+
+	if err != nil {
+		log.Fatal("error connecting to datbase")
+	}
+
+	return bun.NewDB(sqldb, pgdialect.New())
+}
 
 func Init() {
 	var err error

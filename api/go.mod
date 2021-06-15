@@ -15,6 +15,7 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
+	github.com/jackc/pgx/v4 v4.11.0
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/jwx v1.2.0
@@ -28,6 +29,8 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.7.1
 	github.com/ugorji/go v1.2.6 // indirect
+	github.com/uptrace/bun v0.1.17
+	github.com/uptrace/bun/dialect/pgdialect v0.1.17
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
