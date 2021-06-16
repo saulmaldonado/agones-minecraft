@@ -1,64 +1,38 @@
 package main
 
 import (
-	"agones-minecraft/config"
-	"context"
-	"fmt"
+	"flag"
 	"log"
+	"net"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/stdlib"
-	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/migrate"
+	"github.com/go-pg/migrations/v8"
+	"github.com/go-pg/pg/v10"
+
+	"agones-minecraft/config"
 )
 
-var Migrations = migrate.NewMigrations()
-
 func main() {
-	if err := Migrations.DiscoverCaller(); err != nil {
-		log.Fatal(err)
-	}
-
 	config.InitConfig()
-
 	dbConfig := config.GetDBConfig()
 
-	dsn := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
-		dbConfig.User,
-		dbConfig.Password,
-		dbConfig.Hostname,
-		dbConfig.Port,
-		dbConfig.Name,
-	)
+	db := pg.Connect(&pg.Options{
+		Addr:     net.JoinHostPort(dbConfig.Hostname, dbConfig.Port),
+		User:     dbConfig.User,
+		Password: dbConfig.Password,
+		Database: dbConfig.Name,
+	})
 
-	fmt.Println(dsn)
+	flag.Parse()
 
-	config, err := pgx.ParseConfig(dsn)
-	if err != nil {
-		panic(err)
-	}
-
-	// disable prepared statements
-	config.PreferSimpleProtocol = true
-
-	sqldb := stdlib.OpenDB(*config)
+	old, new, err := migrations.Run(db, flag.Args()...)
 
 	if err != nil {
-		log.Fatal("error connecting to datbase")
-	}
-
-	db := bun.NewDB(sqldb, pgdialect.New())
-
-	if err := Migrations.Init(context.Background(), db); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := Migrations.Unlock(context.Background(), db); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := Migrations.Migrate(context.Background(), db); err != nil {
-		log.Fatal(err)
+	if new != old {
+		log.Printf("migrated from version %d to %d\n", old, new)
+	} else {
+		log.Printf("version is %d\n", old)
 	}
 }
