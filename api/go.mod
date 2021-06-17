@@ -34,6 +34,7 @@ require (
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/uptrace/bun v0.1.17
 	github.com/uptrace/bun/dialect/pgdialect v0.1.17
+	github.com/urfave/cli/v2 v2.3.0
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect

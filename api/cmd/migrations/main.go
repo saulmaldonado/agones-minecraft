@@ -1,4 +1,4 @@
-package main
+package migrations
 
 import (
 	"flag"
@@ -11,7 +11,7 @@ import (
 	"agones-minecraft/config"
 )
 
-func main() {
+func Run() error {
 	config.InitConfig()
 	dbConfig := config.GetDBConfig()
 
@@ -27,7 +27,7 @@ func main() {
 	old, new, err := migrations.Run(db, flag.Args()...)
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if new != old {
@@ -35,4 +35,6 @@ func main() {
 	} else {
 		log.Printf("version is %d\n", old)
 	}
+
+	return nil
 }
