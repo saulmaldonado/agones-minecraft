@@ -11,7 +11,7 @@ import (
 	"agones-minecraft/config"
 )
 
-func Run() error {
+func Run(args []string) error {
 	config.InitConfig()
 	dbConfig := config.GetDBConfig()
 
@@ -24,7 +24,7 @@ func Run() error {
 
 	flag.Parse()
 
-	old, new, err := migrations.Run(db, flag.Args()...)
+	old, new, err := migrations.Run(db, args...)
 
 	if err != nil {
 		return err

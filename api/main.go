@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -9,7 +10,7 @@ import (
 	"agones-minecraft/cmd/migrations"
 )
 
-func Run() error {
+func main() {
 	app := &cli.App{
 		Commands: []*cli.Command{
 			{
@@ -23,11 +24,13 @@ func Run() error {
 				Name:  "migrate",
 				Usage: "migrate database",
 				Action: func(c *cli.Context) error {
-					return migrations.Run()
+					return migrations.Run(c.Args().Slice())
 				},
 			},
 		},
 	}
 
-	return app.Run(os.Args)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
 }
