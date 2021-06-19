@@ -2,12 +2,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 --gopg:split
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   email varchar(255) NOT NULL,
   email_verified boolean NOT NULL,
-  twitch_id varchar(255),
-  twitch_username varchar(25),
+  twitch_id varchar(255) NOT NULL,
+  twitch_username varchar(25) NOT NULL,
   twitch_picture text,
   mc_username varchar(16),
   mc_uuid uuid,
@@ -17,11 +17,11 @@ CREATE TABLE users (
   deleted_at timestamptz
 );
 
-CREATE UNIQUE INDEX twitch_id_idx ON users (twitch_id);
+CREATE UNIQUE INDEX IF NOT EXISTS twitch_id_idx ON users (twitch_id);
 
 --gopg:split
 
-CREATE TABLE twitch_tokens (
+CREATE TABLE IF NOT EXISTS twitch_tokens (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   access_token varchar(255) NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE twitch_tokens (
 
 --gopg:split
 
-CREATE TABLE games (
+CREATE TABLE IF NOT EXISTS games (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   name varchar(255) NOT NULL,

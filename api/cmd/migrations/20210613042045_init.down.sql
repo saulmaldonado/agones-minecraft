@@ -1,12 +1,12 @@
-DROP TABLE users CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 --gopg:split
 
-DROP TABLE twitch_tokens CASCADE;
+DROP TABLE IF EXISTS twitch_tokens CASCADE;
 
 --gopg:split
 
-DROP TABLE games CASCADE;
+DROP TABLE IF EXISTS games CASCADE;
 
 --gopg:split
 
