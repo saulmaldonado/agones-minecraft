@@ -17,9 +17,8 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
-	github.com/jackc/pgproto3/v2 v2.0.7 // indirect
-	github.com/jackc/pgx/v4 v4.11.0
 	github.com/json-iterator/go v1.1.11 // indirect
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/jwx v1.2.0
 	github.com/magiconair/properties v1.8.5 // indirect
@@ -32,8 +31,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.7.1
 	github.com/ugorji/go v1.2.6 // indirect
-	github.com/uptrace/bun v0.1.17
-	github.com/uptrace/bun/dialect/pgdialect v0.1.17
 	github.com/urfave/cli/v2 v2.3.0
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.16.0
@@ -43,7 +40,6 @@ require (
 	golang.org/x/sys v0.0.0-20210608053332-aa57babbf139 // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
-	gorm.io/driver/postgres v1.1.0
 	gorm.io/gorm v1.21.10
 	k8s.io/api v0.21.1
 	k8s.io/apimachinery v0.21.1
