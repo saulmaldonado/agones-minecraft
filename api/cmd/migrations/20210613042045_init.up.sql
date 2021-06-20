@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  last_login_at timestamptz NOT NULL DEFAULT now(),
+  last_login timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS mc_accounts (
 --gopg:split
 
 CREATE TABLE IF NOT EXISTS games (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   name varchar(60) NOT NULL,
   motd varchar(59),
