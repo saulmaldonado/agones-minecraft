@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS twitch_accounts (
   picture text,
   access_token varchar(255) NOT NULL,
   refresh_token varchar(255) NOT NULL,
-  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz
