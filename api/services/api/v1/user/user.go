@@ -27,7 +27,7 @@ func GetUserByTwitchId(user *userv1Model.User, twitchId string) error {
 func GetUserById(user *userv1Model.User, userId uuid.UUID) error {
 	return db.DB().Model(user).
 		Join("JOIN twitch_accounts t ON u.id = t.user_id").
-		Join("JOIN mc_accounts mc ON u.id = mc.user_id").
+		Join("LEFT JOIN mc_accounts mc ON u.id = mc.user_id").
 		Where("u.id = ?", userId).
 		First()
 }
