@@ -69,5 +69,8 @@ func (r *RedisStore) Delete(userId string) error {
 }
 
 func (r *RedisStore) Ping() error {
-	return r.redis.Ping(context.Background()).Err()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	return r.redis.Ping(ctx).Err()
 }

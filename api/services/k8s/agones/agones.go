@@ -70,6 +70,23 @@ func New(config *rest.Config) (*AgonesClient, error) {
 	return &AgonesClient{agonesClient, gameServerInformer, recordStore}, nil
 }
 
+func (c *AgonesClient) Ping() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	res, err := c.clientSet.RESTClient().Get().AbsPath("/healthz").DoRaw(ctx)
+	if err != nil {
+		return err
+	}
+
+	content := string(res)
+	if content != "ok" {
+		return fmt.Errorf("not ok, error: %s", content)
+	}
+
+	return nil
+}
+
 // Gets a GameServer by name
 func (c *AgonesClient) Get(serverName string) (*agonesv1.GameServer, error) {
 	return c.informer.Lister().GameServers(metav1.NamespaceDefault).Get(serverName)

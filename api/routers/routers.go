@@ -10,10 +10,14 @@ import (
 
 	"agones-minecraft/config"
 	v1Controllers "agones-minecraft/controllers/api/v1"
+	"agones-minecraft/db"
 	apiErr "agones-minecraft/middleware/errors"
 	"agones-minecraft/middleware/jwt"
 	ginzap "agones-minecraft/middleware/log"
 	"agones-minecraft/middleware/session"
+	jwtServicev1 "agones-minecraft/services/auth/jwt"
+	"agones-minecraft/services/k8s/agones"
+
 	twitchMiddleware "agones-minecraft/middleware/twitch"
 )
 
@@ -28,7 +32,28 @@ func NewRouter() *gin.Engine {
 	engine.Use(ginzap.RecoveryWithZap(zap.L(), false))
 
 	engine.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		var database bool
+		var memorystore bool
+		var cluster bool
+
+		if err := db.Ping(); err == nil {
+			database = true
+		}
+
+		if err := jwtServicev1.Get().Ping(); err == nil {
+			memorystore = true
+		}
+
+		if err := agones.Client().Ping(); err == nil {
+			cluster = true
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"api":         true,
+			"database":    database,
+			"memorystore": memorystore,
+			"cluster":     cluster,
+		})
 	})
 
 	AddV1Router(engine)
