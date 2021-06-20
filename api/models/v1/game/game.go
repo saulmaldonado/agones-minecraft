@@ -1,8 +1,9 @@
 package game
 
 import (
+	"agones-minecraft/models/v1/model"
+
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Edition string
@@ -17,11 +18,12 @@ const (
 )
 
 type Game struct {
-	gorm.Model
-	ID              uuid.UUID `gorm:"type:uuid;primaryKey"`
-	UserID          uuid.UUID
-	Name            string  `gorm:"not null;unique;size:255;default:null"`
-	CustomSubdomain *string `gorm:"size:63;default:null"`
-	Edition         Edition
-	GameState       GameState `gorm:"not null;default:null"`
+	model.Model
+	UserID    uuid.UUID `pg:"type:uuid,notnull,unique"`
+	Name      string    `pg:"type:varchar(60)"`
+	MOTD      string    `pg:"type:varchar(59)"`
+	Slots     int       `pg:"default:10"`
+	Address   string    `pg:"type:varchar(63),notnull"`
+	Edition   Edition   `pg:"type:varchar(25),notnull"`
+	GameState GameState `pg:"type:carchar(25),default:off,notnull"`
 }

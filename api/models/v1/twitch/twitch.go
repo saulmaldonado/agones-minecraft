@@ -1,25 +1,25 @@
 package twitch
 
 import (
+	"agones-minecraft/models/v1/model"
+
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
-type TwitchToken struct {
-	gorm.Model
-	ID                 uuid.UUID `gorm:"type:uuid;primaryKey"`
-	UserID             uuid.UUID
-	TwitchAccessToken  *string `gorm:"not null"`
-	TwitchRefreshToken *string `gorm:"not null"`
+type TwitchAccount struct {
+	model.Model
+	ID            string    `pg:",pk"`
+	Email         string    `pg:",notnull"`
+	EmailVerified bool      `pg:",notnull"`
+	UserID        uuid.UUID `pg:"type:uuid"`
+	AccessToken   string    `pg:",notnull"`
+	RefreshToken  string    `pg:",notnull"`
+	Picture       string
+	Username      string `pg:"type:varchar(25),notnull"`
 }
 
-func (u *TwitchToken) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == uuid.Nil {
-		id, err := uuid.NewRandom()
-		if err != nil {
-			return err
-		}
-		u.ID = id
-	}
-	return nil
+func (t *TwitchAccount) HasChanged(compared *TwitchAccount) bool {
+	return !(t.Email == compared.Email &&
+		t.EmailVerified == compared.EmailVerified &&
+		t.Picture == compared.Picture)
 }
