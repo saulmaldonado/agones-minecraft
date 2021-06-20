@@ -18,7 +18,7 @@ const (
 )
 
 type CreateGameBody struct {
-	CustomSubdomain *string `json:"customSubdomain" binding:"omitempty,hostname_rfc1123"`
+	Address *string `json:"customSubdomain" binding:"omitempty,hostname_rfc1123"`
 }
 
 type Game struct {
