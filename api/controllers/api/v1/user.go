@@ -5,16 +5,18 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	v1Err "agones-minecraft/errors/v1"
 	"agones-minecraft/middleware/jwt"
 	"agones-minecraft/middleware/twitch"
+	mcv1Model "agones-minecraft/models/v1/mc"
+	"agones-minecraft/models/v1/model"
 	userv1Model "agones-minecraft/models/v1/user"
-	apiErr "agones-minecraft/resource/api/v1/errors"
-	userv1Resource "agones-minecraft/resource/api/v1/user"
+	apiErr "agones-minecraft/resources/api/v1/errors"
+	userv1Resource "agones-minecraft/resources/api/v1/user"
 	userv1Service "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/mc"
 )
@@ -33,8 +35,8 @@ func GetMe(c *gin.Context) {
 	}
 
 	var user userv1Model.User
-	if err := userv1Service.GetUserById(uuid.MustParse(userId), &user); err != nil {
-		if err == gorm.ErrRecordNotFound {
+	if err := userv1Service.GetUserById(&user, uuid.MustParse(userId)); err != nil {
+		if err == pg.ErrNoRows {
 			c.Error(apiErr.NewNotFoundError(ErrUserNotFound, v1Err.ErrUserNotFound))
 			return
 		}
@@ -43,24 +45,28 @@ func GetMe(c *gin.Context) {
 	}
 
 	foundUser := userv1Resource.User{
-		ID:             user.ID,
-		Email:          *user.Email,
-		EmailVerified:  *user.EmailVerified,
-		TwitchID:       user.TwitchID,
-		TwitchUsername: user.TwitchUsername,
-		TwitchPicture:  user.TwitchPicture,
-		MCUsername:     user.MCUsername,
-		MCUUID:         user.MCUUID,
-		LastLogin:      user.LastLogin,
-		CreatedAt:      user.CreatedAt,
-		UpdatedAt:      user.UpdatedAt,
+		ID:            user.ID,
+		Email:         user.TwitchAccount.Email,
+		EmailVerified: user.TwitchAccount.EmailVerified,
+		TwitchAccount: userv1Resource.TwitchAccount{
+			TwitchID:       user.TwitchAccount.ID,
+			TwitchUsername: user.TwitchAccount.Username,
+			TwitchPicture:  user.TwitchAccount.Picture,
+		},
+		MCAccount: userv1Resource.MCAccount{
+			MCUsername: user.MCAccount.Username,
+			MCUUID:     user.MCAccount.ID,
+		},
+		LastLogin: user.LastLogin,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
 
 	c.JSON(http.StatusOK, foundUser)
 }
 
 func EditMe(c *gin.Context) {
-	userId := c.GetString(jwt.ContextKey)
+	userId := uuid.MustParse(c.GetString(jwt.ContextKey))
 
 	var body userv1Resource.EditUserBody
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -84,13 +90,17 @@ func EditMe(c *gin.Context) {
 	}
 
 	user := userv1Model.User{
-		ID:         uuid.MustParse(userId),
-		MCUsername: &mcUser.Username,
-		MCUUID:     &mcUser.UUID,
+		Model: model.Model{
+			ID: userId,
+		},
+		MCAccount: &mcv1Model.MCAccount{
+			Model:    model.Model{ID: mcUser.UUID},
+			Username: mcUser.Username,
+		},
 	}
 
-	if err := userv1Service.EditUser(&user); err != nil {
-		if err == gorm.ErrRecordNotFound {
+	if err := userv1Service.EditMCAccount(user.MCAccount, user.ID); err != nil {
+		if err == pg.ErrNoRows {
 			c.Error(apiErr.NewNotFoundError(ErrUserNotFound, v1Err.ErrUserNotFound))
 		} else {
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrUpdatingUser))
@@ -99,17 +109,21 @@ func EditMe(c *gin.Context) {
 	}
 
 	updatedUser := userv1Resource.User{
-		ID:             user.ID,
-		Email:          *user.Email,
-		EmailVerified:  *user.EmailVerified,
-		TwitchID:       user.TwitchID,
-		TwitchUsername: user.TwitchUsername,
-		TwitchPicture:  user.TwitchPicture,
-		MCUsername:     user.MCUsername,
-		MCUUID:         user.MCUUID,
-		LastLogin:      user.LastLogin,
-		CreatedAt:      user.CreatedAt,
-		UpdatedAt:      user.UpdatedAt,
+		ID:            user.ID,
+		Email:         user.TwitchAccount.Email,
+		EmailVerified: user.TwitchAccount.EmailVerified,
+		TwitchAccount: userv1Resource.TwitchAccount{
+			TwitchID:       user.TwitchAccount.ID,
+			TwitchUsername: user.TwitchAccount.Username,
+			TwitchPicture:  user.TwitchAccount.Picture,
+		},
+		MCAccount: userv1Resource.MCAccount{
+			MCUsername: user.MCAccount.Username,
+			MCUUID:     user.MCAccount.ID,
+		},
+		LastLogin: user.LastLogin,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
 
 	c.JSON(http.StatusOK, updatedUser)

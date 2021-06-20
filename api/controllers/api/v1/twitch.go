@@ -3,17 +3,17 @@ package v1Controllers
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
 	v1Err "agones-minecraft/errors/v1"
+	"agones-minecraft/models/v1/mc"
 	twitchv1Model "agones-minecraft/models/v1/twitch"
 	userv1Model "agones-minecraft/models/v1/user"
-	apiErr "agones-minecraft/resource/api/v1/errors"
-	userv1Resource "agones-minecraft/resource/api/v1/user"
+	apiErr "agones-minecraft/resources/api/v1/errors"
+	userv1Resource "agones-minecraft/resources/api/v1/user"
 	userv1 "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/auth/jwt"
 	sessionsauth "agones-minecraft/services/auth/sessions"
@@ -86,33 +86,39 @@ func TwitchCallback(c *gin.Context) {
 	}
 
 	user := userv1Model.User{
-		Email:          &payload.Email,
-		EmailVerified:  &payload.EmailVerified,
-		TwitchID:       &payload.Sub,
-		TwitchUsername: &payload.Username,
-		TwitchPicture:  &payload.Picture,
-		TwitchToken: twitchv1Model.TwitchToken{
-			TwitchAccessToken:  &token.AccessToken,
-			TwitchRefreshToken: &token.RefreshToken,
+		TwitchAccount: &twitchv1Model.TwitchAccount{
+			ID:            payload.Sub,
+			Email:         payload.Email,
+			EmailVerified: payload.EmailVerified,
+			AccessToken:   token.AccessToken,
+			RefreshToken:  token.RefreshToken,
+			Picture:       payload.Picture,
+			Username:      payload.Username,
 		},
-		LastLogin: time.Now(),
+		MCAccount: &mc.MCAccount{},
 	}
 
-	if err := userv1.UpsertUserByTwitchId(&user, user.TwitchID); err != nil {
+	if err := userv1.UpsertUserByTwitchId(&user, user.TwitchAccount.ID); err != nil {
 		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrUpdatingUser))
 		return
 	}
 
 	foundUser := userv1Resource.User{
-		ID:             user.ID,
-		Email:          *user.Email,
-		EmailVerified:  *user.EmailVerified,
-		TwitchID:       user.TwitchID,
-		TwitchUsername: user.TwitchUsername,
-		TwitchPicture:  user.TwitchPicture,
-		LastLogin:      user.LastLogin,
-		CreatedAt:      user.CreatedAt,
-		UpdatedAt:      user.UpdatedAt,
+		ID:            user.ID,
+		Email:         user.TwitchAccount.Email,
+		EmailVerified: user.TwitchAccount.EmailVerified,
+		TwitchAccount: userv1Resource.TwitchAccount{
+			TwitchID:       user.TwitchAccount.ID,
+			TwitchUsername: user.TwitchAccount.Username,
+			TwitchPicture:  user.TwitchAccount.Picture,
+		},
+		MCAccount: userv1Resource.MCAccount{
+			MCUsername: user.MCAccount.Username,
+			MCUUID:     user.MCAccount.ID,
+		},
+		LastLogin: user.LastLogin,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
 
 	tokens, err := jwt.NewTokens(foundUser.ID.String())

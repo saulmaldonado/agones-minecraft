@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 	"moul.io/zapgorm2"
 
@@ -18,7 +17,7 @@ const (
 	DefaultThreshold time.Duration = time.Millisecond * 500
 )
 
-var db *gorm.DB
+var db *pg.DB
 
 func New() *pg.DB {
 	dbconfig := config.GetDBConfig()
@@ -41,16 +40,24 @@ func Init() {
 		logger.LogLevel = gormlogger.Info
 	}
 
-	db := New()
+	pg := New()
 
-	if err := db.Ping(context.Background()); err != nil {
+	if err := pg.Ping(context.Background()); err != nil {
 		zap.L().Fatal("error pinging database", zap.Error(err))
 	}
 
-	db.AddQueryHook(NewLogger(zap.L()))
+	pg.AddQueryHook(NewLogger(zap.L()))
 
+	db = pg
 }
 
-func DB() *gorm.DB {
+func DB() *pg.DB {
 	return db
+}
+
+func Ping() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	return db.Ping(ctx)
 }

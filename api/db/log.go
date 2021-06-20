@@ -26,17 +26,16 @@ func (l *DBLogger) BeforeQuery(ctx context.Context, _ *pg.QueryEvent) (context.C
 
 func (l *DBLogger) AfterQuery(ctx context.Context, q *pg.QueryEvent) error {
 	elapsed := time.Since(q.StartTime)
-	rows := q.Result.RowsAffected()
 
 	err := q.Err
 	sql, _ := q.FormattedQuery() // err is always nil?
 
 	if err != nil {
-		l.logger.Warn("trace", zap.Error(err), zap.Duration("elapsed", elapsed), zap.Int("rows", rows), zap.String("sql", string(sql)))
+		l.logger.Warn("trace", zap.Error(err), zap.Duration("elapsed", elapsed), zap.String("sql", string(sql)))
 	} else if elapsed > SlowThreshold {
-		l.logger.Warn("trace", zap.Duration("elapsed", elapsed), zap.Int("rows", rows), zap.String("sql", string(sql)))
+		l.logger.Warn("trace", zap.Duration("elapsed", elapsed), zap.String("sql", string(sql)))
 	} else {
-		l.logger.Info("trace", zap.Duration("elapsed", elapsed), zap.Int("rows", rows), zap.String("sql", string(sql)))
+		l.logger.Info("trace", zap.Duration("elapsed", elapsed), zap.String("sql", string(sql)))
 	}
 
 	return nil

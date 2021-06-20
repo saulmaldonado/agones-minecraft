@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	gamev1Resource "agones-minecraft/resource/api/v1/game"
+	gamev1Resource "agones-minecraft/resources/api/v1/game"
 	k8s "agones-minecraft/services/k8s"
 )
 

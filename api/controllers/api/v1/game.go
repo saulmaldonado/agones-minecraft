@@ -14,8 +14,8 @@ import (
 	v1Err "agones-minecraft/errors/v1"
 	"agones-minecraft/middleware/jwt"
 	gamev1Model "agones-minecraft/models/v1/game"
-	apiErr "agones-minecraft/resource/api/v1/errors"
-	gamev1Resource "agones-minecraft/resource/api/v1/game"
+	apiErr "agones-minecraft/resources/api/v1/errors"
+	gamev1Resource "agones-minecraft/resources/api/v1/game"
 	gamev1Service "agones-minecraft/services/api/v1/game"
 	"agones-minecraft/services/k8s/agones"
 )
@@ -100,9 +100,9 @@ func CreateJava(c *gin.Context) {
 	}
 
 	game := gamev1Model.Game{
-		CustomSubdomain: body.CustomSubdomain,
-		UserID:          userId,
-		Edition:         gamev1Model.JavaEdition,
+		Address: *body.Address,
+		UserID:  userId,
+		Edition: gamev1Model.JavaEdition,
 	}
 	gs := agones.NewJavaServer()
 	agones.SetUserId(gs, userId) // Set userId label
@@ -145,9 +145,9 @@ func CreateBedrock(c *gin.Context) {
 	}
 
 	game := gamev1Model.Game{
-		CustomSubdomain: body.CustomSubdomain,
-		UserID:          userId,
-		Edition:         gamev1Model.BedrockEdition,
+		Address: *body.Address,
+		UserID:  userId,
+		Edition: gamev1Model.BedrockEdition,
 	}
 	gs := agones.NewBedrockServer()
 	agones.SetUserId(gs, userId) // Set userId label
@@ -186,9 +186,9 @@ func DeleteGame(c *gin.Context) {
 			c.Error(apiErr.NewNotFoundError(err, v1Err.ErrGameNotFound))
 		} else {
 			switch err.(type) {
-			case *gamev1Service.ErrDeletingGameFromDb:
+			case *gamev1Service.ErrDeletingGameFromDB:
 				c.Error(apiErr.NewInternalServerError(err, v1Err.ErrDeletingGameFromDB))
-			case *gamev1Service.ErrDeletingGameFromK8s:
+			case *gamev1Service.ErrDeletingGameFromK8S:
 				c.Error(apiErr.NewInternalServerError(err, v1Err.ErrDeletingGameFromK8s))
 			}
 		}

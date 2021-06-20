@@ -12,7 +12,7 @@ import (
 	v1Err "agones-minecraft/errors/v1"
 	jwtmiddleware "agones-minecraft/middleware/jwt"
 	"agones-minecraft/middleware/twitch"
-	apiErr "agones-minecraft/resource/api/v1/errors"
+	apiErr "agones-minecraft/resources/api/v1/errors"
 	userv1Service "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/auth/jwt"
 )

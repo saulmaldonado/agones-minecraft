@@ -2,7 +2,7 @@ package errors
 
 import (
 	v1Err "agones-minecraft/errors/v1"
-	apiErr "agones-minecraft/resource/api/v1/errors"
+	apiErr "agones-minecraft/resources/api/v1/errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

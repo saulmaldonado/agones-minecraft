@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	gamev1Model "agones-minecraft/models/v1/game"
-	gamev1Resource "agones-minecraft/resource/api/v1/game"
+	gamev1Resource "agones-minecraft/resources/api/v1/game"
 	"agones-minecraft/services/k8s/agones"
 )
 
