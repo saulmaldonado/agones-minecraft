@@ -1,12 +1,12 @@
 package user
 
 import (
+	"context"
 	"errors"
 	"time"
 
+	"github.com/go-pg/pg/v10"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"agones-minecraft/db"
 	userv1Model "agones-minecraft/models/v1/user"
@@ -16,43 +16,58 @@ var (
 	ErrUserRecordNotChanged error = errors.New("user record not changed")
 )
 
-func GetUserByTwitchId(user *userv1Model.User) error {
-	return db.DB().Where("twitch_id = ?", user.TwitchID).Joins("TwitchToken").First(user).Error
+func GetUserByTwitchId(user *userv1Model.User, twitchId string) error {
+	return db.DB().Model(user).
+		Join("JOIN twitch_accounts t ON u.id = t.user_id").
+		Join("JOIN mc_accounts mc ON u.id = mc.user_id").
+		Where("t.id = ?", twitchId).
+		First()
 }
 
-func GetUserById(userId uuid.UUID, user *userv1Model.User) error {
-	return db.DB().Joins("TwitchToken").First(user, userId).Error
+func GetUserById(user *userv1Model.User, userId uuid.UUID) error {
+	return db.DB().Model(user).
+		Join("JOIN twitch_accounts t ON u.id = t.user_id").
+		Join("JOIN mc_accounts mc ON u.id = mc.user_id").
+		Where("u.id = ?", userId).
+		First()
 }
 
 func CreateUser(user *userv1Model.User) error {
-	return db.DB().Create(user).Error
-}
-
-func UpsertUserByTwitchId(user *userv1Model.User, twitchId *string) error {
-	return db.DB().Transaction(func(tx *gorm.DB) error {
-		var foundUser userv1Model.User
-		err := tx.Joins("TwitchToken").First(&foundUser, "twitch_id = ?", twitchId).Error
-
-		if err == gorm.ErrRecordNotFound {
-			return tx.Create(user).Error
-		} else if err != nil {
+	return db.DB().RunInTransaction(context.Background(), func(t *pg.Tx) error {
+		if _, err := t.Model(user).Insert(); err != nil {
 			return err
 		}
 
-		// Revoke old token in goroutine
-		go RevokeOldTwitchTokens(&foundUser.TwitchToken)
+		user.TwitchAccount.UserID = user.ID
+		if _, err := t.Model(user.TwitchAccount).Insert(); err != nil {
+			return err
+		}
 
-		if err := updateUserIfChanged(tx, user, &foundUser); err != nil {
-			if err == ErrUserRecordNotChanged {
-				if err := updateLastLogin(tx, &foundUser, user.LastLogin); err != nil {
-					return err
-				}
-			} else {
+		return nil
+	})
+}
+
+func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
+	return db.DB().RunInTransaction(context.Background(), func(t *pg.Tx) error {
+		var foundUser userv1Model.User
+		if err := GetUserByTwitchId(&foundUser, twitchId); err != nil {
+			if err == pg.ErrNoRows {
+				return CreateUser(user)
+			}
+			return err
+		}
+
+		if foundUser.TwitchAccount != nil {
+			go RevokeOldTwitchTokens(*foundUser.TwitchAccount)
+		}
+
+		if user.TwitchAccount.HasChanged(foundUser.TwitchAccount) {
+			if err := UpdateTwitchAccount(user.TwitchAccount); err != nil {
 				return err
 			}
 		}
 
-		if err := UpdateUserTwitchTokens(foundUser.ID, &user.TwitchToken); err != nil {
+		if err := updateLastLogin(t, user, time.Now()); err != nil {
 			return err
 		}
 
@@ -61,17 +76,8 @@ func UpsertUserByTwitchId(user *userv1Model.User, twitchId *string) error {
 	})
 }
 
-func EditUser(user *userv1Model.User) error {
-	return db.DB().Model(user).Updates(user).First(user).Error
-}
-
-func updateUserIfChanged(tx *gorm.DB, user *userv1Model.User, foundUser *userv1Model.User) error {
-	if user.HasChanged(foundUser) {
-		return tx.Model(&foundUser).Updates(user).Error
-	}
-	return ErrUserRecordNotChanged
-}
-
-func updateLastLogin(tx *gorm.DB, user *userv1Model.User, lastLogin time.Time) error {
-	return tx.Model(user).Omit(clause.Associations, "updated_at").Update("last_login", lastLogin).Error
+func updateLastLogin(tx *pg.Tx, user *userv1Model.User, lastLogin time.Time) error {
+	user.LastLogin = lastLogin
+	_, err := tx.Model(user).WherePK().Set("last_login = ?last_login").Update()
+	return err
 }

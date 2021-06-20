@@ -1,6 +1,9 @@
 package user
 
 import (
+	"time"
+
+	"github.com/go-pg/pg/v10"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -10,57 +13,63 @@ import (
 	"agones-minecraft/services/auth/twitch"
 )
 
-// Get TwitchTokens by its user_id foreign key
-func GetUserTwitchTokens(userId uuid.UUID, twitchToken *twitchv1Model.TwitchToken) error {
-	return db.DB().Where("user_id = ?", userId).First(twitchToken).Error
+func CreateTwitchAccount(tx *pg.Tx, account *twitchv1Model.TwitchAccount) error {
+	_, err := db.DB().Model(account).Insert()
+	return err
 }
 
-func UpdateUserTwitchTokens(userId uuid.UUID, twitchToken *twitchv1Model.TwitchToken) error {
-	return db.DB().Model(twitchv1Model.TwitchToken{}).Where("user_id = ?", userId).Updates(twitchToken).Error
+func GetTwitchAccountByUserId(userId uuid.UUID, account *twitchv1Model.TwitchAccount) error {
+	return db.DB().Model(account).Where("user_id = ?", userId).First()
+}
+
+func UpdateTwitchAccount(account *twitchv1Model.TwitchAccount) error {
+	account.UpdatedAt = time.Now()
+	_, err := db.DB().Model(account).WherePK().Update()
+	return err
 }
 
 func RevokeTwitchTokensForUser(userId uuid.UUID) error {
-	var tokens *twitchv1Model.TwitchToken
-	if err := GetUserTwitchTokens(userId, tokens); err != nil {
+	var account twitchv1Model.TwitchAccount
+	if err := GetTwitchAccountByUserId(userId, &account); err != nil {
 		return err
 	}
 
-	go RevokeOldTwitchTokens(tokens)
+	go RevokeOldTwitchTokens(account)
 	return nil
 }
 
-func RevokeOldTwitchTokens(tokens *twitchv1Model.TwitchToken) {
-	errs := twitch.RevokeTokens(*tokens.TwitchAccessToken, *tokens.TwitchRefreshToken, config.GetTwichCreds().ClientID)
+func RevokeOldTwitchTokens(tokens twitchv1Model.TwitchAccount) {
+	errs := twitch.RevokeTokens(tokens.AccessToken, tokens.RefreshToken, config.GetTwichCreds().ClientID)
 	for _, e := range errs {
 		zap.L().Warn("error revoking old twitch tokens", zap.Error(e))
 	}
 }
 
 func ValidateAndRefreshTwitchTokensForUser(userId uuid.UUID) error {
-	var tokens twitchv1Model.TwitchToken
-	if err := GetUserTwitchTokens(userId, &tokens); err != nil {
+	var account twitchv1Model.TwitchAccount
+	if err := GetTwitchAccountByUserId(userId, &account); err != nil {
 		return err
 	}
 
-	if err := twitch.ValidateToken(*tokens.TwitchAccessToken); err != nil {
+	if err := twitch.ValidateToken(account.AccessToken); err != nil {
 		if err == twitch.ErrInvalidAccessToken {
-			return RefreshTwitchTokensForUser(userId, &tokens)
+			return RefreshTwitchTokensForUser(userId, &account)
 		}
 	}
 
 	return nil
 }
 
-func RefreshTwitchTokensForUser(userId uuid.UUID, tokens *twitchv1Model.TwitchToken) error {
+func RefreshTwitchTokensForUser(userId uuid.UUID, account *twitchv1Model.TwitchAccount) error {
 	creds := config.GetTwichCreds()
 
-	newTokens, err := twitch.Refresh(*tokens.TwitchRefreshToken, creds.ClientID, creds.ClientSecret)
+	newTokens, err := twitch.Refresh(account.RefreshToken, creds.ClientID, creds.ClientSecret)
 	if err != nil {
 		return err
 	}
 
-	tokens.TwitchAccessToken = &newTokens.AccessToken
-	tokens.TwitchRefreshToken = &newTokens.RefreshToken
+	account.AccessToken = newTokens.AccessToken
+	account.RefreshToken = newTokens.RefreshToken
 
-	return UpdateUserTwitchTokens(userId, tokens)
+	return UpdateTwitchAccount(account)
 }

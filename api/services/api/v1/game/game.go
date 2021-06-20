@@ -2,11 +2,12 @@ package game
 
 import (
 	"agones-minecraft/db"
+	"context"
 	"errors"
 
 	v1 "agones.dev/agones/pkg/apis/agones/v1"
+	"github.com/go-pg/pg/v10"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	gamev1Model "agones-minecraft/models/v1/game"
 	gamev1Resource "agones-minecraft/resource/api/v1/game"
@@ -18,13 +19,21 @@ var (
 	ErrGameServerNotFound error = errors.New("game server not found")
 )
 
-func GetGameById(game *gamev1Model.Game, ID uuid.UUID) error {
-	game.ID = ID
-	return db.DB().First(game).Error
+type ErrDeletingGameFromK8S struct {
+	error
+}
+
+type ErrDeletingGameFromDB struct {
+	error
+}
+
+func GetGameById(game *gamev1Model.Game, id uuid.UUID) error {
+	game.ID = id
+	return db.DB().Model(game).WherePK().First()
 }
 
 func GetGameByName(game *gamev1Model.Game, name string) error {
-	return db.DB().Where("name = ?", name).First(game).Error
+	return db.DB().Model(game).Where("name = ?", name).First()
 }
 
 func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
@@ -44,17 +53,15 @@ func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
 }
 
 func GetGameByUserIdAndName(game *gamev1Model.Game, userId uuid.UUID, name string) error {
-	return db.DB().Where("user_id = ? AND name = ?", userId, name).First(game).Error
+	return db.DB().Model(game).Where("name = ? AND user_id = ?", name, userId).First()
 }
 
 func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
-	return db.DB().Transaction(func(tx *gorm.DB) error {
-		if game.CustomSubdomain != nil {
-			if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), *game.CustomSubdomain); !ok {
-				return ErrSubdomainTaken
-			}
-			agones.SetHostname(gs, agones.GetDNSZone(), *game.CustomSubdomain)
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), game.Address); !ok {
+			return ErrSubdomainTaken
 		}
+		agones.SetHostname(gs, agones.GetDNSZone(), game.Address)
 
 		gameServer, err := agones.Client().CreateDryRun(gs)
 		if err != nil {
@@ -68,7 +75,7 @@ func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
 		game.Name = gs.Name
 		game.GameState = gamev1Model.On
 
-		if err := db.DB().Create(game).Error; err != nil {
+		if _, err := db.DB().Model(game).Insert(); err != nil {
 			return err
 		}
 
@@ -80,29 +87,22 @@ func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
 	})
 }
 
-type ErrDeletingGameFromK8s struct {
-	error
-}
-
-type ErrDeletingGameFromDb struct {
-	error
-}
-
 func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {
-	return db.DB().Transaction(func(tx *gorm.DB) error {
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
 		if err := GetGameByUserIdAndName(game, userId, name); err != nil {
-			if err == gorm.ErrRecordNotFound {
+			if err == pg.ErrNoRows {
 				return ErrGameServerNotFound
 			}
-			return &ErrDeletingGameFromDb{err}
+
+			return &ErrDeletingGameFromDB{err}
 		}
 
-		if err := db.DB().Delete(game).Error; err != nil {
-			return &ErrDeletingGameFromDb{err}
+		if _, err := db.DB().Model(game).Delete(); err != nil {
+			return &ErrDeletingGameFromDB{err}
 		}
 
 		if err := agones.Client().Delete(name); err != nil {
-			return &ErrDeletingGameFromK8s{err}
+			return &ErrDeletingGameFromK8S{err}
 		}
 
 		return nil
@@ -110,5 +110,6 @@ func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {
 }
 
 func UpdateGame(game *gamev1Model.Game) error {
-	return db.DB().Model(game).Updates(game).First(game).Error
+	_, err := db.DB().Model(game).WherePK().Update()
+	return err
 }
