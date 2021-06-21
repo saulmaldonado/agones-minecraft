@@ -6,16 +6,16 @@ import (
 	"errors"
 
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-
-	"agones-minecraft/config"
 )
 
 const (
-	SessionNamev1    = "agones-minecraft-api-twitch-oauth-v1"
-	StateCallbackKey = "state-callback"
-	TokenKey         = "token"
+	SessionNamev1    string = "agones-minecraft-api-twitch-oauth-v1"
+	StateCallbackKey string = "state-callback"
+
+	SessionPath string = "/api/v1"
+	// 5 min
+	SessionMaxAge int = 300
 )
 
 var (
@@ -23,21 +23,6 @@ var (
 	ErrMissingStateChallenge = errors.New("missing state from cookie")
 	ErrFailedStateChallenge  = errors.New("failed state challenge")
 )
-
-var Store cookie.Store
-
-func Init() {
-	Store = NewStore()
-}
-
-func NewStore() cookie.Store {
-	authKey, encKey := config.GetSessionSecret()
-	return cookie.NewStore(authKey, encKey)
-}
-
-func GetStore() cookie.Store {
-	return Store
-}
 
 func NewState() (string, error) {
 	var tokenBytes [255]byte
@@ -49,23 +34,30 @@ func NewState() (string, error) {
 }
 
 func AddStateFlash(c *gin.Context, state string) error {
-	sess := sessions.Default(c)
+	sess := sessions.DefaultMany(c, SessionNamev1)
 
 	// clear the session if its not new.
 	sess.Clear()
 
 	sess.AddFlash(state, StateCallbackKey)
 
+	sess.Options(sessions.Options{
+		Path:     SessionPath,
+		MaxAge:   SessionMaxAge,
+		Secure:   true,
+		HttpOnly: true,
+	})
+
 	return sess.Save()
 }
 
 func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
-	sess := sessions.Default(c)
+	sess := sessions.DefaultMany(c, SessionNamev1)
 
 	var err error
 
 	stateChallenge := sess.Flashes(StateCallbackKey)
-	if e := sess.Save(); e != nil {
+	if e := DestorySession(sess); e != nil {
 		err = e
 	}
 
@@ -82,4 +74,15 @@ func VerifyStateFlash(c *gin.Context, state string) (bool, error) {
 	}
 
 	return true, err
+}
+
+func DestorySession(sess sessions.Session) error {
+	sess.Options(sessions.Options{
+		Path:     SessionPath,
+		MaxAge:   -1,
+		Secure:   true,
+		HttpOnly: true,
+	})
+
+	return sess.Save()
 }

@@ -17,6 +17,10 @@ const (
 	ErrMissingStateChallenge ErrorID = "59ad"
 	// failed state challenge
 	ErrFailedStateChallenge ErrorID = "4775"
+	// invalid or missing session cookie in request
+	ErrUnautorizedSession ErrorID = "1494"
+	// error saving session and adding cookie to request
+	ErrSavingSession ErrorID = "85a6"
 	// error exchanging token for twitch token
 	ErrTwitchTokenExchange ErrorID = "56a5"
 	// errors getting token payload

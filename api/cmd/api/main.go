@@ -5,8 +5,7 @@ import (
 	"agones-minecraft/db"
 	"agones-minecraft/log"
 	"agones-minecraft/routers"
-	"agones-minecraft/services/auth/jwt"
-	sessions "agones-minecraft/services/auth/sessions/oauth"
+	sessions "agones-minecraft/services/auth/sessions"
 	"agones-minecraft/services/auth/twitch"
 	"agones-minecraft/services/k8s"
 	"agones-minecraft/services/k8s/agones"
@@ -22,14 +21,12 @@ func Run() error {
 	k8s.InitConfig()
 	// Connects to k8s cluster and initializes agones client and informer
 	agones.Init()
-	// Initializes authentication cookie store
+	// Initializes session and oauth session redis store
 	sessions.Init()
 	// Initializes database connections and migrates (in development)
 	db.Init()
 	// Initializes Twitch ODIC provider for login with Twitch
 	twitch.Init()
-	// Initializes JWT token store
-	jwt.Init()
 	// Initializes custom validators
 	validator.InitV1()
 

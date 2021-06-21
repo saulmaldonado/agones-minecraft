@@ -12,7 +12,6 @@ import (
 	v1Controllers "agones-minecraft/controllers/api/v1"
 	"agones-minecraft/db"
 	apiErr "agones-minecraft/middleware/errors"
-	"agones-minecraft/middleware/jwt"
 	ginzap "agones-minecraft/middleware/log"
 	"agones-minecraft/middleware/session"
 	jwtServicev1 "agones-minecraft/services/auth/jwt"
@@ -78,14 +77,14 @@ func AddV1Router(r *gin.Engine) {
 
 	auth := v1.Group("/auth")
 	{
-		auth.POST("/refresh", v1Controllers.Refresh)
-		auth.Use(jwt.Authorizer())
+		// auth.POST("/refresh", v1Controllers.Refresh)
+		auth.Use(session.Authorizer())
 		auth.POST("/logout", v1Controllers.Logout)
 	}
 
 	user := v1.Group("/user")
 	{
-		user.Use(jwt.Authorizer())
+		user.Use(session.Authorizer())
 		user.Use(twitchMiddleware.Authorizer())
 		user.GET("/me", v1Controllers.GetMe)
 		user.POST("/me", v1Controllers.EditMe)
@@ -94,10 +93,10 @@ func AddV1Router(r *gin.Engine) {
 	game := v1.Group("/game")
 	{
 		game.GET("", v1Controllers.ListGames)
-		game.GET("/:name/status", jwt.Authenticator(), v1Controllers.GetGameState)
+		game.GET("/:name/status", session.Authenticator(), v1Controllers.GetGameState)
 		game.GET("/:name", v1Controllers.GetGame)
 
-		game.Use(jwt.Authorizer())
+		game.Use(session.Authorizer())
 		game.POST("/java", v1Controllers.CreateJava)
 		game.POST("/bedrock", v1Controllers.CreateBedrock)
 		game.DELETE("/:name", v1Controllers.DeleteGame)

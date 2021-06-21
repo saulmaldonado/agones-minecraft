@@ -12,7 +12,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	v1Err "agones-minecraft/errors/v1"
-	"agones-minecraft/middleware/jwt"
+	"agones-minecraft/middleware/session"
 	gamev1Model "agones-minecraft/models/v1/game"
 	apiErr "agones-minecraft/resources/api/v1/errors"
 	gamev1Resource "agones-minecraft/resources/api/v1/game"
@@ -67,9 +67,9 @@ func GetGameState(c *gin.Context) {
 			return
 		}
 	} else {
-		v, ok := c.Get(jwt.ContextKey)
+		v, ok := c.Get(session.SessionUserIDKey)
 		if ok {
-			userId := v.(string)
+			userId := v.(uuid.UUID).String()
 			if userId == game.UserID.String() {
 				c.JSON(http.StatusOK, game)
 				return
@@ -85,8 +85,8 @@ func GetGameState(c *gin.Context) {
 }
 
 func CreateJava(c *gin.Context) {
-	v := c.GetString(jwt.ContextKey)
-	userId := uuid.MustParse(v)
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
 
 	var body gamev1Resource.CreateGameBody
 	if err := c.ShouldBindJSON(&body); err != nil && err != io.EOF {
@@ -130,8 +130,8 @@ func CreateJava(c *gin.Context) {
 }
 
 func CreateBedrock(c *gin.Context) {
-	v := c.GetString(jwt.ContextKey)
-	userId := uuid.MustParse(v)
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
 
 	var body gamev1Resource.CreateGameBody
 	if err := c.ShouldBindJSON(&body); err != nil && err != io.EOF {
@@ -174,8 +174,8 @@ func CreateBedrock(c *gin.Context) {
 }
 
 func DeleteGame(c *gin.Context) {
-	v := c.GetString(jwt.ContextKey)
-	userId := uuid.MustParse(v)
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
 
 	name := c.Param("name")
 

@@ -15,6 +15,7 @@ const (
 	DB_HOST              = "DB_HOST"
 	DB_PORT              = "DB_PORT"
 	DB_NAME              = "DB_NAME"
+	OAUTH_SESSION_SECRET = "OAUTH_SESSION_SECRET"
 	SESSION_SECRET       = "SESSION_SECRET"
 	TWITCH_CLIENT_ID     = "TWITCH_CLIENT_ID"
 	TWITCH_CLIENT_SECRET = "TWITCH_CLIENT_SECRET"
@@ -81,15 +82,24 @@ func GetPort() string {
 	return viper.GetString(PORT)
 }
 
-// Returns secret for sessions
+// Returns secrets for oauth sessions
+func GetOAuthSessionSecret() (authKey []byte, encKey []byte) {
+	keys := viper.GetStringSlice(OAUTH_SESSION_SECRET)
+	if len(keys) < 2 {
+		log.Fatal("missing SESSION_SECRET authenticationa and encryption keys")
+	}
+
+	return []byte(keys[0]), []byte(keys[1])
+}
+
+// Returns secrets for sessions
 func GetSessionSecret() (authKey []byte, encKey []byte) {
 	keys := viper.GetStringSlice(SESSION_SECRET)
 	if len(keys) < 2 {
 		log.Fatal("missing SESSION_SECRET authenticationa and encryption keys")
 	}
-	authKey = []byte(keys[0])
-	encKey = []byte(keys[1])
-	return
+
+	return []byte(keys[0]), []byte(keys[1])
 }
 
 // ID, secret and current redirect for Twitch

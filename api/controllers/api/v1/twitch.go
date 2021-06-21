@@ -14,7 +14,7 @@ import (
 	apiErr "agones-minecraft/resources/api/v1/errors"
 	userv1Resource "agones-minecraft/resources/api/v1/user"
 	userv1 "agones-minecraft/services/api/v1/user"
-	"agones-minecraft/services/auth/jwt"
+	"agones-minecraft/services/auth/sessions"
 	sessionsauth "agones-minecraft/services/auth/sessions/oauth"
 	"agones-minecraft/services/auth/twitch"
 )
@@ -25,6 +25,7 @@ const (
 
 var (
 	ErrTwitchUnverifiedEmail error = errors.New("twitch email not verified")
+	ErrSavingSession         error = errors.New("error saving session")
 )
 
 func TwitchLogin(c *gin.Context) {
@@ -115,19 +116,10 @@ func TwitchCallback(c *gin.Context) {
 		UpdatedAt: user.UpdatedAt,
 	}
 
-	tokens, err := jwt.NewTokens(foundUser.ID.String())
-	if err != nil {
-		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrGeneratingNewTokens))
+	if err := sessions.SetSession(c, foundUser.ID); err != nil {
+		c.Error(apiErr.NewInternalServerError(ErrSavingSession, v1Err.ErrSavingSession))
 		return
 	}
 
-	if err := jwt.Get().Set(foundUser.ID.String(), tokens.TokenId, tokens.RefreshTokenExp); err != nil {
-		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrSavingNewTokens))
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"tokens": tokens,
-		"user":   foundUser,
-	})
+	c.JSON(http.StatusOK, foundUser)
 }

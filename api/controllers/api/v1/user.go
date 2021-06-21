@@ -10,8 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	v1Err "agones-minecraft/errors/v1"
-	"agones-minecraft/middleware/jwt"
-	"agones-minecraft/middleware/twitch"
+	"agones-minecraft/middleware/session"
 	mcv1Model "agones-minecraft/models/v1/mc"
 	"agones-minecraft/models/v1/model"
 	userv1Model "agones-minecraft/models/v1/user"
@@ -27,15 +26,11 @@ var (
 )
 
 func GetMe(c *gin.Context) {
-	v, ok := c.Get(twitch.SubjectKey)
-	userId, okUserId := v.(string)
-	if !ok || !okUserId {
-		c.Error(apiErr.NewUnauthorizedError(ErrMissingUserId, v1Err.ErrMissingUserId))
-		return
-	}
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
 
 	var user userv1Model.User
-	if err := userv1Service.GetUserById(&user, uuid.MustParse(userId)); err != nil {
+	if err := userv1Service.GetUserById(&user, userId); err != nil {
 		if err == pg.ErrNoRows {
 			c.Error(apiErr.NewNotFoundError(ErrUserNotFound, v1Err.ErrUserNotFound))
 			return
