@@ -6,7 +6,7 @@ import (
 	"agones-minecraft/log"
 	"agones-minecraft/routers"
 	"agones-minecraft/services/auth/jwt"
-	"agones-minecraft/services/auth/sessions"
+	sessions "agones-minecraft/services/auth/sessions/oauth"
 	"agones-minecraft/services/auth/twitch"
 	"agones-minecraft/services/k8s"
 	"agones-minecraft/services/k8s/agones"

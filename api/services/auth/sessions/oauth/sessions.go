@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SessionNamev1    = "agones-minecraft-api-v1"
+	SessionNamev1    = "agones-minecraft-api-twitch-oauth-v1"
 	StateCallbackKey = "state-callback"
 	TokenKey         = "token"
 )
@@ -23,12 +23,6 @@ var (
 	ErrMissingStateChallenge = errors.New("missing state from cookie")
 	ErrFailedStateChallenge  = errors.New("failed state challenge")
 )
-
-type SessionService interface {
-	NewState() (string, error)
-	AddStateCookie(c *gin.Context, state string) error
-	VerifyStateCookie(c *gin.Context) (bool, error)
-}
 
 var Store cookie.Store
 

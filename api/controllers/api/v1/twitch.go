@@ -15,7 +15,7 @@ import (
 	userv1Resource "agones-minecraft/resources/api/v1/user"
 	userv1 "agones-minecraft/services/api/v1/user"
 	"agones-minecraft/services/auth/jwt"
-	sessionsauth "agones-minecraft/services/auth/sessions"
+	sessionsauth "agones-minecraft/services/auth/sessions/oauth"
 	"agones-minecraft/services/auth/twitch"
 )
 

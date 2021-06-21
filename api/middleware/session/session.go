@@ -5,7 +5,7 @@ import (
 
 	s "github.com/gin-contrib/sessions"
 
-	sessionsSvc "agones-minecraft/services/auth/sessions"
+	sessionsSvc "agones-minecraft/services/auth/sessions/oauth"
 )
 
 func Sessions() gin.HandlerFunc {
