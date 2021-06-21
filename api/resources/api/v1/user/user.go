@@ -7,14 +7,14 @@ import (
 )
 
 type User struct {
-	ID            uuid.UUID     `json:"id"`
-	Email         string        `json:"email"`
-	EmailVerified bool          `json:"emailVerified"`
-	TwitchAccount TwitchAccount `json:"twitchAccount"`
-	MCAccount     MCAccount     `json:"mcAccount"`
-	LastLogin     time.Time     `json:"lastLogin"`
-	CreatedAt     time.Time     `json:"createdAt"`
-	UpdatedAt     time.Time     `json:"updatedAt"`
+	ID            uuid.UUID      `json:"id"`
+	Email         string         `json:"email"`
+	EmailVerified bool           `json:"emailVerified"`
+	TwitchAccount *TwitchAccount `json:"twitchAccount"`
+	MCAccount     *MCAccount     `json:"mcAccount"`
+	LastLogin     time.Time      `json:"lastLogin"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
 }
 
 type TwitchAccount struct {

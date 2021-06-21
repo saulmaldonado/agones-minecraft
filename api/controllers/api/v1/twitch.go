@@ -107,14 +107,10 @@ func TwitchCallback(c *gin.Context) {
 		ID:            user.ID,
 		Email:         user.TwitchAccount.Email,
 		EmailVerified: user.TwitchAccount.EmailVerified,
-		TwitchAccount: userv1Resource.TwitchAccount{
+		TwitchAccount: &userv1Resource.TwitchAccount{
 			TwitchID:       user.TwitchAccount.ID,
 			TwitchUsername: user.TwitchAccount.Username,
 			TwitchPicture:  user.TwitchAccount.Picture,
-		},
-		MCAccount: userv1Resource.MCAccount{
-			MCUsername: user.MCAccount.Username,
-			MCUUID:     user.MCAccount.ID,
 		},
 		LastLogin: user.LastLogin,
 		CreatedAt: user.CreatedAt,

@@ -44,19 +44,25 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
+	var mcAccount *userv1Resource.MCAccount
+
+	if user.MCAccount != nil {
+		mcAccount = &userv1Resource.MCAccount{
+			MCUsername: user.MCAccount.Username,
+			MCUUID:     user.MCAccount.ID,
+		}
+	}
+
 	foundUser := userv1Resource.User{
 		ID:            user.ID,
 		Email:         user.TwitchAccount.Email,
 		EmailVerified: user.TwitchAccount.EmailVerified,
-		TwitchAccount: userv1Resource.TwitchAccount{
+		TwitchAccount: &userv1Resource.TwitchAccount{
 			TwitchID:       user.TwitchAccount.ID,
 			TwitchUsername: user.TwitchAccount.Username,
 			TwitchPicture:  user.TwitchAccount.Picture,
 		},
-		MCAccount: userv1Resource.MCAccount{
-			MCUsername: user.MCAccount.Username,
-			MCUUID:     user.MCAccount.ID,
-		},
+		MCAccount: mcAccount,
 		LastLogin: user.LastLogin,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
@@ -112,12 +118,12 @@ func EditMe(c *gin.Context) {
 		ID:            user.ID,
 		Email:         user.TwitchAccount.Email,
 		EmailVerified: user.TwitchAccount.EmailVerified,
-		TwitchAccount: userv1Resource.TwitchAccount{
+		TwitchAccount: &userv1Resource.TwitchAccount{
 			TwitchID:       user.TwitchAccount.ID,
 			TwitchUsername: user.TwitchAccount.Username,
 			TwitchPicture:  user.TwitchAccount.Picture,
 		},
-		MCAccount: userv1Resource.MCAccount{
+		MCAccount: &userv1Resource.MCAccount{
 			MCUsername: user.MCAccount.Username,
 			MCUUID:     user.MCAccount.ID,
 		},
