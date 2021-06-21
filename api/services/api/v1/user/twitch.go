@@ -24,7 +24,18 @@ func GetTwitchAccountByUserId(userId uuid.UUID, account *twitchv1Model.TwitchAcc
 
 func UpdateTwitchAccount(account *twitchv1Model.TwitchAccount) error {
 	account.UpdatedAt = time.Now()
-	_, err := db.DB().Model(account).WherePK().Update()
+	_, err := db.DB().Model(account).WherePK().UpdateNotZero()
+	return err
+}
+
+func UpdateTwitchAccountTokens(account *twitchv1Model.TwitchAccount) error {
+	account.UpdatedAt = time.Now()
+	_, err := db.DB().Model(account).
+		Set("access_token = ?access_token", account.AccessToken).
+		Set("refresh_token = ?refresh_token", account.RefreshToken).
+		Set("updated_at = ?updated_at", account.UpdatedAt).
+		WherePK().
+		UpdateNotZero()
 	return err
 }
 

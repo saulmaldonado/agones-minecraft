@@ -16,35 +16,17 @@ var (
 	ErrUserRecordNotChanged error = errors.New("user record not changed")
 )
 
-func GetUserByTwitchId(user *userv1Model.User, twitchId string) error {
-	return db.DB().Model(user).
-		Relation("TwitchAccount").
-		Relation("MCAccount").
-		Where("twitch_account.id = ?", twitchId).
-		First()
-}
-
-func GetUserById(user *userv1Model.User, userId uuid.UUID) error {
-	return db.DB().Model(user).
-		Relation("TwitchAccount").
-		Relation("MCAccount").
-		Where("u.id = ?", userId).
-		First()
-}
-
 func CreateUser(user *userv1Model.User) error {
-	return db.DB().RunInTransaction(context.Background(), func(t *pg.Tx) error {
-		if _, err := t.Model(user).Insert(); err != nil {
-			return err
-		}
+	if _, err := db.DB().Model(user).Insert(); err != nil {
+		return err
+	}
 
-		user.TwitchAccount.UserID = user.ID
-		if _, err := t.Model(user.TwitchAccount).Insert(); err != nil {
-			return err
-		}
+	user.TwitchAccount.UserID = user.ID
+	if _, err := db.DB().Model(user.TwitchAccount).Insert(); err != nil {
+		return err
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
@@ -65,9 +47,13 @@ func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
 			if err := UpdateTwitchAccount(user.TwitchAccount); err != nil {
 				return err
 			}
+		} else {
+			if err := UpdateTwitchAccountTokens(user.TwitchAccount); err != nil {
+				return err
+			}
 		}
 
-		if err := updateLastLogin(t, user, time.Now()); err != nil {
+		if err := UpdateLastLogin(t, user, time.Now()); err != nil {
 			return err
 		}
 
@@ -76,7 +62,23 @@ func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
 	})
 }
 
-func updateLastLogin(tx *pg.Tx, user *userv1Model.User, lastLogin time.Time) error {
+func GetUserByTwitchId(user *userv1Model.User, twitchId string) error {
+	return db.DB().Model(user).
+		Relation("TwitchAccount").
+		Relation("MCAccount").
+		Where("twitch_account.id = ?", twitchId).
+		First()
+}
+
+func GetUserById(user *userv1Model.User, userId uuid.UUID) error {
+	return db.DB().Model(user).
+		Relation("TwitchAccount").
+		Relation("MCAccount").
+		Where("u.id = ?", userId).
+		First()
+}
+
+func UpdateLastLogin(tx *pg.Tx, user *userv1Model.User, lastLogin time.Time) error {
 	user.LastLogin = lastLogin
 	_, err := tx.Model(user).WherePK().Set("last_login = ?last_login").Update()
 	return err

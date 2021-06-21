@@ -9,7 +9,6 @@ import (
 	"golang.org/x/oauth2"
 
 	v1Err "agones-minecraft/errors/v1"
-	"agones-minecraft/models/v1/mc"
 	twitchv1Model "agones-minecraft/models/v1/twitch"
 	userv1Model "agones-minecraft/models/v1/user"
 	apiErr "agones-minecraft/resources/api/v1/errors"
@@ -95,7 +94,6 @@ func TwitchCallback(c *gin.Context) {
 			Picture:       payload.Picture,
 			Username:      payload.Username,
 		},
-		MCAccount: &mc.MCAccount{},
 	}
 
 	if err := userv1.UpsertUserByTwitchId(&user, user.TwitchAccount.ID); err != nil {
