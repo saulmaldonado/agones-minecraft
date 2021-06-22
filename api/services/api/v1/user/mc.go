@@ -23,7 +23,7 @@ func UpsertUserMCAccount(user *userv1Model.User, userId uuid.UUID) error {
 
 		_, err := t.Model(user.MCAccount).
 			OnConflict("(user_id) WHERE deleted_at IS NULL DO UPDATE").
-			Set("id = EXCLUDED.id, skin = EXCLUDED.skin, username = EXCLUDED.username, updated_at = ?", updatedAt).
+			Set("mc_id = EXCLUDED.mc_id, skin = EXCLUDED.skin, username = EXCLUDED.username, updated_at = ?", updatedAt).
 			Insert()
 		if err != nil {
 			return err

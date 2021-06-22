@@ -87,7 +87,7 @@ func TwitchCallback(c *gin.Context) {
 
 	user := userv1Model.User{
 		TwitchAccount: &twitchv1Model.TwitchAccount{
-			ID:            payload.Sub,
+			TwitchID:      payload.Sub,
 			Email:         payload.Email,
 			EmailVerified: payload.EmailVerified,
 			AccessToken:   token.AccessToken,
@@ -97,7 +97,7 @@ func TwitchCallback(c *gin.Context) {
 		},
 	}
 
-	if err := userv1.UpsertUserByTwitchId(&user, user.TwitchAccount.ID); err != nil {
+	if err := userv1.UpsertUserByTwitchId(&user, user.TwitchAccount.TwitchID); err != nil {
 		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrUpdatingUser))
 		return
 	}
@@ -107,7 +107,7 @@ func TwitchCallback(c *gin.Context) {
 		Email:         user.TwitchAccount.Email,
 		EmailVerified: user.TwitchAccount.EmailVerified,
 		TwitchAccount: &userv1Resource.TwitchAccount{
-			TwitchID:       user.TwitchAccount.ID,
+			TwitchID:       user.TwitchAccount.TwitchID,
 			TwitchUsername: user.TwitchAccount.Username,
 			TwitchPicture:  user.TwitchAccount.Picture,
 		},

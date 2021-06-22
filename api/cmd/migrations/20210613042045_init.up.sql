@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
 --gopg:split
 
 CREATE TABLE IF NOT EXISTS twitch_accounts (
-  id text PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  twitch_id text NOT NULL,
   email text NOT NULL,
   email_verified boolean NOT NULL,
   username varchar(25) NOT NULL,
@@ -26,10 +27,14 @@ CREATE TABLE IF NOT EXISTS twitch_accounts (
   deleted_at timestamptz
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS twitch_accounts_user_id_key ON twitch_accounts (user_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS twitch_accounts_twitch_id_key ON twitch_accounts (twitch_id) WHERE deleted_at IS NULL;
+
 --gopg:split
 
 CREATE TABLE IF NOT EXISTS mc_accounts (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mc_id uuid NOT NULL,
   username varchar(16) NOT NULL,
   skin text,
   user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
@@ -38,8 +43,8 @@ CREATE TABLE IF NOT EXISTS mc_accounts (
   deleted_at timestamptz
 );
 
-CREATE UNIQUE INDEX mc_accounts_user_id_key ON mc_accounts (user_id) WHERE deleted_at IS NULL;
-CREATE UNIQUE INDEX mc_accounts_key ON mc_accounts (id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS mc_accounts_user_id_key ON mc_accounts (user_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS mc_accounts_mc_id_key ON mc_accounts (mc_id) WHERE deleted_at IS NULL;
 
 --gopg:split
 

@@ -66,7 +66,7 @@ func GetUserByTwitchId(user *userv1Model.User, twitchId string) error {
 	return db.DB().Model(user).
 		Relation("TwitchAccount").
 		Relation("MCAccount").
-		Where("twitch_account.id = ?", twitchId).
+		Where("twitch_account.twitch_id = ?", twitchId).
 		First()
 }
 

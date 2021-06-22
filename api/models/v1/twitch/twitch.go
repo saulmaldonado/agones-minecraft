@@ -8,10 +8,10 @@ import (
 
 type TwitchAccount struct {
 	model.Model
-	ID            string    `pg:",pk"`
+	TwitchID      string    `pg:",unique,notnull"`
 	Email         string    `pg:",notnull"`
 	EmailVerified bool      `pg:",notnull"`
-	UserID        uuid.UUID `pg:"type:uuid"`
+	UserID        uuid.UUID `pg:"type:uuid,unique"`
 	AccessToken   string    `pg:",notnull"`
 	RefreshToken  string    `pg:",notnull"`
 	Picture       string

@@ -12,7 +12,6 @@ import (
 	v1Err "agones-minecraft/errors/v1"
 	"agones-minecraft/middleware/session"
 	mcv1Model "agones-minecraft/models/v1/mc"
-	"agones-minecraft/models/v1/model"
 	userv1Model "agones-minecraft/models/v1/user"
 	apiErr "agones-minecraft/resources/api/v1/errors"
 	userv1Resource "agones-minecraft/resources/api/v1/user"
@@ -53,7 +52,7 @@ func GetMe(c *gin.Context) {
 		Email:         user.TwitchAccount.Email,
 		EmailVerified: user.TwitchAccount.EmailVerified,
 		TwitchAccount: &userv1Resource.TwitchAccount{
-			TwitchID:       user.TwitchAccount.ID,
+			TwitchID:       user.TwitchAccount.TwitchID,
 			TwitchUsername: user.TwitchAccount.Username,
 			TwitchPicture:  user.TwitchAccount.Picture,
 		},
@@ -93,7 +92,7 @@ func EditMe(c *gin.Context) {
 
 	user := userv1Model.User{
 		MCAccount: &mcv1Model.MCAccount{
-			Model:    model.Model{ID: mcUser.UUID},
+			MCID:     mcUser.UUID,
 			UserID:   userId,
 			Username: mcUser.Username,
 			Skin:     mcUser.Textures.Skin.URL,
@@ -114,7 +113,7 @@ func EditMe(c *gin.Context) {
 		Email:         user.TwitchAccount.Email,
 		EmailVerified: user.TwitchAccount.EmailVerified,
 		TwitchAccount: &userv1Resource.TwitchAccount{
-			TwitchID:       user.TwitchAccount.ID,
+			TwitchID:       user.TwitchAccount.TwitchID,
 			TwitchUsername: user.TwitchAccount.Username,
 			TwitchPicture:  user.TwitchAccount.Picture,
 		},
