@@ -32,11 +32,14 @@ CREATE TABLE IF NOT EXISTS mc_accounts (
   id uuid PRIMARY KEY,
   username varchar(16) NOT NULL,
   skin text,
-  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz
 );
+
+CREATE UNIQUE INDEX mc_accounts_user_id_key ON mc_accounts (user_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX mc_accounts_key ON mc_accounts (id) WHERE deleted_at IS NULL;
 
 --gopg:split
 

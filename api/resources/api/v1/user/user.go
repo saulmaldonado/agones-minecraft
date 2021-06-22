@@ -26,6 +26,7 @@ type TwitchAccount struct {
 type MCAccount struct {
 	MCUsername string    `json:"mcUsername"`
 	MCUUID     uuid.UUID `json:"mcUuid"`
+	Skin       string    `json:"skin"`
 }
 
 type EditUserBody struct {

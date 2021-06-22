@@ -67,7 +67,8 @@ func GetMe(c *gin.Context) {
 }
 
 func EditMe(c *gin.Context) {
-	userId := uuid.MustParse(c.GetString(jwt.ContextKey))
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
 
 	var body userv1Resource.EditUserBody
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -91,16 +92,15 @@ func EditMe(c *gin.Context) {
 	}
 
 	user := userv1Model.User{
-		Model: model.Model{
-			ID: userId,
-		},
 		MCAccount: &mcv1Model.MCAccount{
 			Model:    model.Model{ID: mcUser.UUID},
+			UserID:   userId,
 			Username: mcUser.Username,
+			Skin:     mcUser.Textures.Skin.URL,
 		},
 	}
 
-	if err := userv1Service.EditMCAccount(user.MCAccount, user.ID); err != nil {
+	if err := userv1Service.UpsertUserMCAccount(&user, userId); err != nil {
 		if err == pg.ErrNoRows {
 			c.Error(apiErr.NewNotFoundError(ErrUserNotFound, v1Err.ErrUserNotFound))
 		} else {
@@ -121,6 +121,7 @@ func EditMe(c *gin.Context) {
 		MCAccount: &userv1Resource.MCAccount{
 			MCUsername: user.MCAccount.Username,
 			MCUUID:     user.MCAccount.ID,
+			Skin:       user.MCAccount.Skin,
 		},
 		LastLogin: user.LastLogin,
 		CreatedAt: user.CreatedAt,
