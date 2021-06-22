@@ -47,6 +47,8 @@ const (
 	ErrEditUserValidation ErrorID = "38a2"
 	// mc username not found error
 	ErrMcUserNotFound ErrorID = "33e3"
+	// error unmarshalling mc user json
+	ErrUnmarshalingMCAccountJSON = "7808"
 	// error getting minecraft user
 	ErrRetrievingMcUser ErrorID = "dda6"
 	// missing refresh token from request

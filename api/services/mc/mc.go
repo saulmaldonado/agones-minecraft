@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,8 @@ const (
 type ErrMcUserNotFound struct {
 	mcUsername string
 }
+
+type ErrUnmarshalingMCAccountJSON struct{ error }
 
 func (e ErrMcUserNotFound) Error() string {
 	return fmt.Sprintf("minecraft username %s not found", e.mcUsername)
@@ -40,7 +43,22 @@ type McUser struct {
 			Signature string `json:"signature"`
 		} `json:"raw"`
 	} `json:"textures"`
-	CreatedAt *time.Time `json:"created_at"`
+	CreatedAt *McAccountDate `json:"created_at"`
+}
+
+// Custom time format for MC account creation dates
+type McAccountDate time.Time
+
+// Custom unmarshaler for mc account creation dates
+func (d *McAccountDate) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), "\"")
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return err
+	}
+
+	*d = McAccountDate(t)
+	return nil
 }
 
 func GetUser(mcUsername string) (*McUser, error) {
@@ -57,7 +75,7 @@ func GetUser(mcUsername string) (*McUser, error) {
 
 	var user McUser
 	if err := json.NewDecoder(res.Body).Decode(&user); err != nil {
-		return nil, err
+		return nil, &ErrUnmarshalingMCAccountJSON{err}
 	}
 
 	return &user, nil

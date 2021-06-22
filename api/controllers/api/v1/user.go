@@ -82,9 +82,12 @@ func EditMe(c *gin.Context) {
 
 	mcUser, err := mc.GetUser(body.MCUsername)
 	if err != nil {
-		if e, ok := err.(*mc.ErrMcUserNotFound); ok {
-			c.Error(apiErr.NewNotFoundError(e, v1Err.ErrMcUserNotFound))
-		} else {
+		switch e := err.(type) {
+		case *mc.ErrMcUserNotFound:
+			c.Error(apiErr.NewBadRequestError(e, v1Err.ErrMcUserNotFound))
+		case *mc.ErrUnmarshalingMCAccountJSON:
+			c.Error(apiErr.NewInternalServerError(e, v1Err.ErrUnmarshalingMCAccountJSON))
+		default:
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingMcUser))
 		}
 		return
