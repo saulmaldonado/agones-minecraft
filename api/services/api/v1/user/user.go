@@ -16,13 +16,13 @@ var (
 	ErrUserRecordNotChanged error = errors.New("user record not changed")
 )
 
-func CreateUser(user *userv1Model.User) error {
-	if _, err := db.DB().Model(user).Insert(); err != nil {
+func CreateUser(t *pg.Tx, user *userv1Model.User) error {
+	if _, err := t.Model(user).Insert(); err != nil {
 		return err
 	}
 
 	user.TwitchAccount.UserID = user.ID
-	if _, err := db.DB().Model(user.TwitchAccount).Insert(); err != nil {
+	if _, err := t.Model(user.TwitchAccount).Insert(); err != nil {
 		return err
 	}
 
@@ -34,7 +34,7 @@ func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
 		var foundUser userv1Model.User
 		if err := GetUserByTwitchId(&foundUser, twitchId); err != nil {
 			if err == pg.ErrNoRows {
-				return CreateUser(user)
+				return CreateUser(t, user)
 			}
 			return err
 		}
