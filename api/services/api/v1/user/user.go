@@ -33,41 +33,44 @@ func CreateUserWithTwitchAccount(t *pg.Tx, user *userv1Model.User) error {
 	return err
 }
 
+// Idempotent single transaction method that will:
+//  1. Find user in database by the given twitchId
+//  2. If missing user will be created accorind to the given user model
+//  3. Refresh stored oauth Twitch tokens by revoking old tokens, request new tokens, and save them
+//  4. Update the Twitch account record in database if changed according to twitch account model
+//  5. Update the last login timestamp for user model
 func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
 	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
 		var foundUser userv1Model.User
-		if err := GetUserByTwitchId(&foundUser, twitchId); err != nil {
+		if err := GetUserByTwitchId(tx, &foundUser, twitchId); err != nil {
 			if err == pg.ErrNoRows {
 				return CreateUserWithTwitchAccount(tx, user)
 			}
 			return err
 		}
 
-		if foundUser.TwitchAccount != nil {
-			go RevokeOldTwitchTokens(*foundUser.TwitchAccount)
-		}
+		go RevokeOldTwitchTokens(*foundUser.TwitchAccount)
 
-		if user.TwitchAccount.HasChanged(foundUser.TwitchAccount) {
-			if err := UpdateTwitchAccount(tx, user.TwitchAccount); err != nil {
-				return err
-			}
-		} else {
-			if err := UpdateTwitchAccountTokens(tx, user.TwitchAccount); err != nil {
-				return err
-			}
+		// replace stored twitch account with newest one
+		acc := user.TwitchAccount
+		acc.ID = foundUser.TwitchAccount.ID
+		*user = foundUser
+		user.TwitchAccount = acc
+
+		if err := UpdateTwitchAccount(tx, user.TwitchAccount); err != nil {
+			return err
 		}
 
 		if err := UpdateLastLogin(tx, user, time.Now()); err != nil {
 			return err
 		}
 
-		*user = foundUser
 		return nil
 	})
 }
 
-func GetUserByTwitchId(user *userv1Model.User, twitchId string) error {
-	return db.DB().Model(user).
+func GetUserByTwitchId(tx *pg.Tx, user *userv1Model.User, twitchId string) error {
+	return tx.Model(user).
 		Relation("TwitchAccount").
 		Relation("MCAccount").
 		Where("twitch_account.twitch_id = ?", twitchId).
