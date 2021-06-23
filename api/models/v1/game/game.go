@@ -19,11 +19,11 @@ const (
 
 type Game struct {
 	model.Model
-	UserID    uuid.UUID `pg:"type:uuid,notnull,unique"`
-	Name      string    `pg:"type:varchar(60)"`
-	MOTD      string    `pg:"type:varchar(59)"`
-	Slots     int       `pg:"default:10"`
-	Address   string    `pg:"type:varchar(63),notnull"`
-	Edition   Edition   `pg:"type:varchar(25),notnull"`
-	GameState GameState `pg:"type:carchar(25),default:off,notnull"`
+	UserID  uuid.UUID `pg:"type:uuid,notnull,unique"`
+	Name    string    `pg:"type:varchar(60)"`
+	MOTD    string    `pg:"type:varchar(59)"`
+	Slots   int       `pg:"default:10"`
+	Address string    `pg:"type:varchar(63),notnull"`
+	Edition Edition   `pg:"type:varchar(25),notnull"`
+	State   GameState `pg:"type:carchar(25),default:off,notnull"`
 }

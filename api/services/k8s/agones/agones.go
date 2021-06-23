@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -95,6 +96,17 @@ func (c *AgonesClient) Get(serverName string) (*agonesv1.GameServer, error) {
 // Gets all GameServers for default namespace
 func (c *AgonesClient) List() ([]*agonesv1.GameServer, error) {
 	return c.informer.Lister().GameServers(metav1.NamespaceDefault).List(labels.Everything())
+}
+
+func (c *AgonesClient) ListGamesForUser(userId string) ([]*agonesv1.GameServer, error) {
+	req, err := labels.NewRequirement(UserIdLabel, selection.Equals, []string{userId})
+	if err != nil {
+		return nil, err
+	}
+
+	return c.informer.Lister().
+		GameServers(metav1.NamespaceDefault).
+		List(labels.NewSelector().Add(*req))
 }
 
 // Creates a new GameServer

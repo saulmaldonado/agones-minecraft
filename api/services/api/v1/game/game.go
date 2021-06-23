@@ -36,6 +36,10 @@ func GetGameByName(game *gamev1Model.Game, name string) error {
 	return db.DB().Model(game).Where("name = ?", name).First()
 }
 
+func ListGamesForUser(games *[]*gamev1Model.Game, userId uuid.UUID) error {
+	return db.DB().Model(games).Where("user_id = ?", userId).Select()
+}
+
 func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
 	var foundGame gamev1Model.Game
 	if err := GetGameByName(&foundGame, name); err != nil {
@@ -73,7 +77,7 @@ func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
 
 		game.ID = uuid.MustParse(string(gs.UID))
 		game.Name = gs.Name
-		game.GameState = gamev1Model.On
+		game.State = gamev1Model.On
 
 		if _, err := db.DB().Model(game).Insert(); err != nil {
 			return err

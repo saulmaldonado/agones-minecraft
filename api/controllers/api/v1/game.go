@@ -24,13 +24,18 @@ var (
 	ErrGameNotFound error = errors.New("game server not found")
 )
 
-func ListGames(c *gin.Context) {
-	gameServers, err := agones.Client().List()
-	if err != nil {
+func ListGamesForUser(c *gin.Context) {
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
+
+	games := []*gamev1Model.Game{}
+
+	if err := gamev1Service.ListGamesForUser(&games, userId); err != nil {
 		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrListingGames))
 		return
 	}
-	c.JSON(http.StatusOK, gameServers)
+
+	c.JSON(http.StatusOK, games)
 }
 
 func GetGame(c *gin.Context) {
