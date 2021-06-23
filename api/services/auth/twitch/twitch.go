@@ -1,7 +1,6 @@
 package twitch
 
 import (
-	"agones-minecraft/config"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,9 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
+
+	"agones-minecraft/config"
+	appHttp "agones-minecraft/services/http"
 )
 
 const (
@@ -62,7 +64,7 @@ func NewTwitchConfig(provider *oidc.Provider, scopes ...string) *oauth2.Config {
 
 func NewToken(code string) (*oauth2.Token, error) {
 	config := NewTwitchConfig(TwitchOIDCProvider)
-	return config.Exchange(context.Background(), code)
+	return config.Exchange(context.WithValue(context.Background(), oauth2.HTTPClient, appHttp.Client()), code)
 }
 
 func Init() {
@@ -92,7 +94,7 @@ func GetUserInfo(token string, userInfo *UserInfo) error {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
-	res, err := http.DefaultClient.Do(req)
+	res, err := appHttp.Client().Do(req)
 
 	if err != nil {
 		return err
@@ -164,7 +166,7 @@ func ValidateToken(accessToken string) error {
 	}
 
 	req.Header.Set("Authorization", "OAuth "+accessToken)
-	res, err := http.DefaultClient.Do(req)
+	res, err := appHttp.Client().Do(req)
 	if err != nil {
 		return err
 	}
@@ -204,7 +206,7 @@ func Refresh(refreshToken, clientId, clientSecret string) (*oauth2.Token, error)
 
 	req.URL.RawQuery = que.Encode()
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := appHttp.Client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +256,7 @@ func RevokeToken(token, clientId string) error {
 
 	tokenReq.URL.RawQuery = aQ.Encode()
 
-	res, err := http.DefaultClient.Do(tokenReq)
+	res, err := appHttp.Client().Do(tokenReq)
 	if err != nil {
 		return err
 	}

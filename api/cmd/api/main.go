@@ -7,6 +7,7 @@ import (
 	"agones-minecraft/routers"
 	sessions "agones-minecraft/services/auth/sessions"
 	"agones-minecraft/services/auth/twitch"
+	appHttp "agones-minecraft/services/http"
 	"agones-minecraft/services/k8s"
 	"agones-minecraft/services/k8s/agones"
 	"agones-minecraft/services/validator"
@@ -19,6 +20,8 @@ func Run() error {
 	log.Init()
 	// Initializes k8s cluster config
 	k8s.InitConfig()
+	// Initializes app http client
+	appHttp.Init()
 	// Connects to k8s cluster and initializes agones client and informer
 	agones.Init()
 	// Initializes session and oauth session redis store

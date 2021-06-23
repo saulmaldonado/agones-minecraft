@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	appHttp "agones-minecraft/services/http"
 )
 
 const (
@@ -62,7 +64,12 @@ func (d *McAccountDate) UnmarshalJSON(b []byte) error {
 }
 
 func GetUser(mcUsername string) (*McUser, error) {
-	res, err := http.Get(UserEndpoint + mcUsername)
+	req, err := http.NewRequest("GET", UserEndpoint+mcUsername, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := appHttp.Client().Do(req)
 	if err != nil {
 		return nil, err
 	}
