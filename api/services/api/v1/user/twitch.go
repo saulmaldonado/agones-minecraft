@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -14,23 +15,23 @@ import (
 )
 
 func CreateTwitchAccount(tx *pg.Tx, account *twitchv1Model.TwitchAccount) error {
-	_, err := db.DB().Model(account).Insert()
+	_, err := tx.Model(account).Insert()
 	return err
 }
 
-func GetTwitchAccountByUserId(userId uuid.UUID, account *twitchv1Model.TwitchAccount) error {
-	return db.DB().Model(account).Where("user_id = ?", userId).First()
+func GetTwitchAccountByUserId(tx *pg.Tx, userId uuid.UUID, account *twitchv1Model.TwitchAccount) error {
+	return tx.Model(account).Where("user_id = ?", userId).First()
 }
 
-func UpdateTwitchAccount(account *twitchv1Model.TwitchAccount) error {
+func UpdateTwitchAccount(tx *pg.Tx, account *twitchv1Model.TwitchAccount) error {
 	account.UpdatedAt = time.Now()
-	_, err := db.DB().Model(account).WherePK().UpdateNotZero()
+	_, err := tx.Model(account).WherePK().UpdateNotZero()
 	return err
 }
 
-func UpdateTwitchAccountTokens(account *twitchv1Model.TwitchAccount) error {
+func UpdateTwitchAccountTokens(tx *pg.Tx, account *twitchv1Model.TwitchAccount) error {
 	account.UpdatedAt = time.Now()
-	_, err := db.DB().Model(account).
+	_, err := tx.Model(account).
 		Set("access_token = ?access_token", account.AccessToken).
 		Set("refresh_token = ?refresh_token", account.RefreshToken).
 		Set("updated_at = ?updated_at", account.UpdatedAt).
@@ -39,9 +40,9 @@ func UpdateTwitchAccountTokens(account *twitchv1Model.TwitchAccount) error {
 	return err
 }
 
-func RevokeTwitchTokensForUser(userId uuid.UUID) error {
+func RevokeTwitchTokensForUser(tx *pg.Tx, userId uuid.UUID) error {
 	var account twitchv1Model.TwitchAccount
-	if err := GetTwitchAccountByUserId(userId, &account); err != nil {
+	if err := GetTwitchAccountByUserId(tx, userId, &account); err != nil {
 		return err
 	}
 
@@ -57,21 +58,23 @@ func RevokeOldTwitchTokens(tokens twitchv1Model.TwitchAccount) {
 }
 
 func ValidateAndRefreshTwitchTokensForUser(userId uuid.UUID) error {
-	var account twitchv1Model.TwitchAccount
-	if err := GetTwitchAccountByUserId(userId, &account); err != nil {
-		return err
-	}
-
-	if err := twitch.ValidateToken(account.AccessToken); err != nil {
-		if err == twitch.ErrInvalidAccessToken {
-			return RefreshTwitchTokensForUser(userId, &account)
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		var account twitchv1Model.TwitchAccount
+		if err := GetTwitchAccountByUserId(tx, userId, &account); err != nil {
+			return err
 		}
-	}
 
-	return nil
+		if err := twitch.ValidateToken(account.AccessToken); err != nil {
+			if err == twitch.ErrInvalidAccessToken {
+				return RefreshTwitchTokensForUser(tx, userId, &account)
+			}
+		}
+
+		return nil
+	})
 }
 
-func RefreshTwitchTokensForUser(userId uuid.UUID, account *twitchv1Model.TwitchAccount) error {
+func RefreshTwitchTokensForUser(tx *pg.Tx, userId uuid.UUID, account *twitchv1Model.TwitchAccount) error {
 	creds := config.GetTwichCreds()
 
 	newTokens, err := twitch.Refresh(account.RefreshToken, creds.ClientID, creds.ClientSecret)
@@ -82,5 +85,5 @@ func RefreshTwitchTokensForUser(userId uuid.UUID, account *twitchv1Model.TwitchA
 	account.AccessToken = newTokens.AccessToken
 	account.RefreshToken = newTokens.RefreshToken
 
-	return UpdateTwitchAccount(account)
+	return UpdateTwitchAccount(tx, account)
 }

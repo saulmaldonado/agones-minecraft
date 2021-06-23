@@ -16,25 +16,29 @@ var (
 	ErrUserRecordNotChanged error = errors.New("user record not changed")
 )
 
-func CreateUser(t *pg.Tx, user *userv1Model.User) error {
-	if _, err := t.Model(user).Insert(); err != nil {
-		return err
-	}
+func CreateUserWithTwitchAccount(t *pg.Tx, user *userv1Model.User) error {
+	newUser := t.Model(user).
+		Returning("*")
 
-	user.TwitchAccount.UserID = user.ID
-	if _, err := t.Model(user.TwitchAccount).Insert(); err != nil {
-		return err
-	}
+	newTwitchUser := t.Model(user.TwitchAccount).
+		Value("user_id", "(SELECT id FROM u)").
+		Returning("*")
 
-	return nil
+	err := t.Model().
+		WithInsert("u", newUser).
+		WithInsert("twitch_account", newTwitchUser).
+		Table("u").
+		Select(user)
+
+	return err
 }
 
 func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
-	return db.DB().RunInTransaction(context.Background(), func(t *pg.Tx) error {
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
 		var foundUser userv1Model.User
 		if err := GetUserByTwitchId(&foundUser, twitchId); err != nil {
 			if err == pg.ErrNoRows {
-				return CreateUser(t, user)
+				return CreateUserWithTwitchAccount(tx, user)
 			}
 			return err
 		}
@@ -44,16 +48,16 @@ func UpsertUserByTwitchId(user *userv1Model.User, twitchId string) error {
 		}
 
 		if user.TwitchAccount.HasChanged(foundUser.TwitchAccount) {
-			if err := UpdateTwitchAccount(user.TwitchAccount); err != nil {
+			if err := UpdateTwitchAccount(tx, user.TwitchAccount); err != nil {
 				return err
 			}
 		} else {
-			if err := UpdateTwitchAccountTokens(user.TwitchAccount); err != nil {
+			if err := UpdateTwitchAccountTokens(tx, user.TwitchAccount); err != nil {
 				return err
 			}
 		}
 
-		if err := UpdateLastLogin(t, user, time.Now()); err != nil {
+		if err := UpdateLastLogin(tx, user, time.Now()); err != nil {
 			return err
 		}
 
