@@ -14,7 +14,6 @@ import (
 	apiErr "agones-minecraft/middleware/errors"
 	ginzap "agones-minecraft/middleware/log"
 	"agones-minecraft/middleware/session"
-	jwtServicev1 "agones-minecraft/services/auth/jwt"
 	"agones-minecraft/services/k8s/agones"
 
 	twitchMiddleware "agones-minecraft/middleware/twitch"
@@ -32,15 +31,10 @@ func NewRouter() *gin.Engine {
 
 	engine.GET("/health", func(c *gin.Context) {
 		var database bool
-		var memorystore bool
 		var cluster bool
 
 		if err := db.Ping(); err == nil {
 			database = true
-		}
-
-		if err := jwtServicev1.Get().Ping(); err == nil {
-			memorystore = true
 		}
 
 		if err := agones.Client().Ping(); err == nil {
@@ -48,10 +42,9 @@ func NewRouter() *gin.Engine {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"api":         true,
-			"database":    database,
-			"memorystore": memorystore,
-			"cluster":     cluster,
+			"api":      true,
+			"database": database,
+			"cluster":  cluster,
 		})
 	})
 
