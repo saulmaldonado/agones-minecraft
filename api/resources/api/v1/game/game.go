@@ -22,13 +22,13 @@ type CreateGameBody struct {
 }
 
 type Game struct {
-	ID        uuid.UUID           `json:"id"`
-	UserID    uuid.UUID           `json:"userId"`
-	Name      string              `json:"name"`
-	DNSRecord string              `json:"dnsRecord"`
-	Edition   gamev1Model.Edition `json:"edition"`
-	Status    Status              `json:"status"`
-	CreatedAt time.Time           `json:"createdAt"`
+	ID        uuid.UUID             `json:"id"`
+	UserID    uuid.UUID             `json:"userId"`
+	Name      string                `json:"name"`
+	Address   string                `json:"address"`
+	Edition   gamev1Model.Edition   `json:"edition"`
+	State     gamev1Model.GameState `json:"state"`
+	CreatedAt time.Time             `json:"createdAt"`
 }
 
 type GameStatus struct {

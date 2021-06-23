@@ -28,14 +28,27 @@ func ListGamesForUser(c *gin.Context) {
 	v, _ := c.Get(session.SessionUserIDKey)
 	userId := v.(uuid.UUID)
 
-	games := []*gamev1Model.Game{}
+	var games []*gamev1Model.Game
 
 	if err := gamev1Service.ListGamesForUser(&games, userId); err != nil {
 		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrListingGames))
 		return
 	}
 
-	c.JSON(http.StatusOK, games)
+	gameServers := []*gamev1Resource.Game{}
+
+	for _, game := range games {
+		gameServers = append(gameServers, &gamev1Resource.Game{
+			ID:        game.ID,
+			Name:      game.Name,
+			Address:   game.Address,
+			Edition:   game.Edition,
+			State:     game.State,
+			CreatedAt: game.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gameServers)
 }
 
 func GetGame(c *gin.Context) {
@@ -125,9 +138,9 @@ func CreateJava(c *gin.Context) {
 		ID:        game.ID,
 		UserID:    game.UserID,
 		Name:      game.Name,
-		DNSRecord: agones.GetHostname(gs),
+		Address:   agones.GetHostname(gs),
 		Edition:   game.Edition,
-		Status:    gamev1Resource.Starting,
+		State:     game.State,
 		CreatedAt: game.CreatedAt,
 	}
 
@@ -169,9 +182,9 @@ func CreateBedrock(c *gin.Context) {
 		ID:        game.ID,
 		UserID:    game.UserID,
 		Name:      game.Name,
-		DNSRecord: agones.GetHostname(gs),
+		Address:   agones.GetHostname(gs),
 		Edition:   game.Edition,
-		Status:    gamev1Resource.Starting,
+		State:     game.State,
 		CreatedAt: game.CreatedAt,
 	}
 
