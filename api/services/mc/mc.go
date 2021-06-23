@@ -30,20 +30,15 @@ type McUser struct {
 	UUID            uuid.UUID `json:"uuid"`
 	Username        string    `json:"username"`
 	UsernameHistory []struct {
-		Username  string     `json:"username"`
-		ChangedAt *time.Time `json:"changed_at,omitempty"`
+		Username  string         `json:"username"`
+		ChangedAt *McAccountDate `json:"changed_at,omitempty"`
 	} `json:"username_history"`
 	Textures struct {
 		Custom bool `json:"custom"`
 		Slim   bool `json:"slim"`
 		Skin   struct {
-			URL  string `json:"url"`
-			Data string `json:"data"`
+			URL string `json:"url"`
 		} `json:"skin"`
-		Raw struct {
-			Value     string `json:"value"`
-			Signature string `json:"signature"`
-		} `json:"raw"`
 	} `json:"textures"`
 	CreatedAt *McAccountDate `json:"created_at"`
 }
