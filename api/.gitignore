@@ -1,3 +1,4 @@
 .env
 kubeconfig.yml
 *.errors
+.vscode

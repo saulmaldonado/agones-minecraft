@@ -7,6 +7,8 @@ const (
 
 	ErrMalformedJSON ErrorID = "0001"
 
+	ErrMissingRequestBody ErrorID = "0002"
+
 	// random bytes read io err
 	ErrNewState ErrorID = "b7b3"
 	// state cookie encryption or encoding err

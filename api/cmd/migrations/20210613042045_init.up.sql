@@ -49,7 +49,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS mc_accounts_mc_id_key ON mc_accounts (mc_id) W
 --gopg:split
 
 CREATE TABLE IF NOT EXISTS games (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   name varchar(60) NOT NULL,
   motd varchar(59),

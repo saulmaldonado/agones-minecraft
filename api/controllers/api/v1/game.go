@@ -8,8 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	v1Err "agones-minecraft/errors/v1"
 	"agones-minecraft/middleware/session"
@@ -17,87 +15,43 @@ import (
 	apiErr "agones-minecraft/resources/api/v1/errors"
 	gamev1Resource "agones-minecraft/resources/api/v1/game"
 	gamev1Service "agones-minecraft/services/api/v1/game"
-	"agones-minecraft/services/k8s/agones"
 )
 
 var (
-	ErrGameNotFound error = errors.New("game server not found")
+	ErrGameNotFound       error = errors.New("game server not found")
+	ErrMissingRequestBody error = errors.New("missing request body")
 )
 
 func ListGamesForUser(c *gin.Context) {
 	v, _ := c.Get(session.SessionUserIDKey)
 	userId := v.(uuid.UUID)
 
-	var games []*gamev1Model.Game
+	games := []*gamev1Resource.Game{}
 
 	if err := gamev1Service.ListGamesForUser(&games, userId); err != nil {
 		c.Error(apiErr.NewInternalServerError(err, v1Err.ErrListingGames))
 		return
 	}
 
-	gameServers := []*gamev1Resource.Game{}
-
-	for _, game := range games {
-		gameServers = append(gameServers, &gamev1Resource.Game{
-			ID:        game.ID,
-			Name:      game.Name,
-			Address:   game.Address,
-			Edition:   game.Edition,
-			State:     game.State,
-			CreatedAt: game.CreatedAt,
-		})
-	}
-
-	c.JSON(http.StatusOK, gameServers)
+	c.JSON(http.StatusOK, games)
 }
 
 func GetGame(c *gin.Context) {
+	v, _ := c.Get(session.SessionUserIDKey)
+	userId := v.(uuid.UUID)
+
 	name := c.Param("name")
-	gameServer, err := agones.Client().Get(name)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
+
+	var game gamev1Resource.Game
+
+	if err := gamev1Service.GetGameByNameAndUserId(&game, name, userId); err != nil {
+		if err == gamev1Service.ErrGameServerNotFound {
 			c.Error(apiErr.NewNotFoundError(ErrGameNotFound, v1Err.ErrGameNotFound))
 		} else {
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingGameServer))
 		}
 		return
 	}
-	c.JSON(http.StatusOK, gameServer)
-}
-
-func GetGameState(c *gin.Context) {
-	name := c.Param("name")
-
-	var game gamev1Resource.GameStatus
-
-	if err := agones.GetGameStatusByName(&game, name); err != nil {
-		if k8sErrors.IsNotFound(err) {
-			if err := gamev1Service.GetGameStatusByName(&game, name); err != nil {
-				if err == gorm.ErrRecordNotFound {
-					c.Error(apiErr.NewNotFoundError(ErrGameNotFound, v1Err.ErrGameNotFound))
-				} else {
-					c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingGameServerFromDB))
-				}
-				return
-			}
-		} else {
-			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrRetrievingGameServer))
-			return
-		}
-	} else {
-		v, ok := c.Get(session.SessionUserIDKey)
-		if ok {
-			userId := v.(uuid.UUID).String()
-			if userId == game.UserID.String() {
-				c.JSON(http.StatusOK, game)
-				return
-			}
-		}
-	}
-
-	game.Address = nil
-	game.Hostname = nil
-	game.Port = nil
 
 	c.JSON(http.StatusOK, game)
 }
@@ -107,25 +61,21 @@ func CreateJava(c *gin.Context) {
 	userId := v.(uuid.UUID)
 
 	var body gamev1Resource.CreateGameBody
-	if err := c.ShouldBindJSON(&body); err != nil && err != io.EOF {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		var verrs validator.ValidationErrors
 		if errors.As(err, &verrs) {
 			c.Errors = append(c.Errors, apiErr.NewValidationError(verrs, v1Err.ErrCreateGameServerValidation)...)
+		} else if err == io.EOF {
+			c.Error(apiErr.NewBadRequestError(ErrMissingRequestBody, v1Err.ErrMissingRequestBody))
 		} else {
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrMalformedJSON))
 		}
 		return
 	}
 
-	game := gamev1Model.Game{
-		Address: *body.Address,
-		UserID:  userId,
-		Edition: gamev1Model.JavaEdition,
-	}
-	gs := agones.NewJavaServer()
-	agones.SetUserId(gs, userId) // Set userId label
+	var game gamev1Resource.Game
 
-	if err := gamev1Service.CreateGame(&game, gs); err != nil {
+	if err := gamev1Service.CreateGame(&game, gamev1Model.JavaEdition, body, userId); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
 			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrSubdomainTaken))
 		} else {
@@ -134,17 +84,7 @@ func CreateJava(c *gin.Context) {
 		return
 	}
 
-	createdGame := gamev1Resource.Game{
-		ID:        game.ID,
-		UserID:    game.UserID,
-		Name:      game.Name,
-		Address:   agones.GetHostname(gs),
-		Edition:   game.Edition,
-		State:     game.State,
-		CreatedAt: game.CreatedAt,
-	}
-
-	c.JSON(http.StatusCreated, createdGame)
+	c.JSON(http.StatusCreated, game)
 }
 
 func CreateBedrock(c *gin.Context) {
@@ -152,25 +92,21 @@ func CreateBedrock(c *gin.Context) {
 	userId := v.(uuid.UUID)
 
 	var body gamev1Resource.CreateGameBody
-	if err := c.ShouldBindJSON(&body); err != nil && err != io.EOF {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		var verrs validator.ValidationErrors
 		if errors.As(err, &verrs) {
 			c.Errors = append(c.Errors, apiErr.NewValidationError(verrs, v1Err.ErrCreateGameServerValidation)...)
+		} else if err == io.EOF {
+			c.Error(apiErr.NewBadRequestError(ErrMissingRequestBody, v1Err.ErrMissingRequestBody))
 		} else {
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrMalformedJSON))
 		}
 		return
 	}
 
-	game := gamev1Model.Game{
-		Address: *body.Address,
-		UserID:  userId,
-		Edition: gamev1Model.BedrockEdition,
-	}
-	gs := agones.NewBedrockServer()
-	agones.SetUserId(gs, userId) // Set userId label
+	var game gamev1Resource.Game
 
-	if err := gamev1Service.CreateGame(&game, gs); err != nil {
+	if err := gamev1Service.CreateGame(&game, gamev1Model.BedrockEdition, body, userId); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
 			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrSubdomainTaken))
 		} else {
@@ -178,17 +114,8 @@ func CreateBedrock(c *gin.Context) {
 		}
 		return
 	}
-	createdGame := gamev1Resource.Game{
-		ID:        game.ID,
-		UserID:    game.UserID,
-		Name:      game.Name,
-		Address:   agones.GetHostname(gs),
-		Edition:   game.Edition,
-		State:     game.State,
-		CreatedAt: game.CreatedAt,
-	}
 
-	c.JSON(http.StatusCreated, createdGame)
+	c.JSON(http.StatusCreated, game)
 }
 
 func DeleteGame(c *gin.Context) {
@@ -197,9 +124,7 @@ func DeleteGame(c *gin.Context) {
 
 	name := c.Param("name")
 
-	var game gamev1Model.Game
-
-	if err := gamev1Service.DeleteGame(&game, userId, name); err != nil {
+	if err := gamev1Service.DeleteGame(userId, name); err != nil {
 		if err == gamev1Service.ErrGameServerNotFound {
 			c.Error(apiErr.NewNotFoundError(err, v1Err.ErrGameNotFound))
 		} else {

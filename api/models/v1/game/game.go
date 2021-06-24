@@ -1,9 +1,11 @@
 package game
 
 import (
-	"agones-minecraft/models/v1/model"
+	"fmt"
 
 	"github.com/google/uuid"
+
+	"agones-minecraft/models/v1/model"
 )
 
 type Edition string
@@ -25,5 +27,9 @@ type Game struct {
 	Slots   int       `pg:"default:10"`
 	Address string    `pg:"type:varchar(63),notnull"`
 	Edition Edition   `pg:"type:varchar(25),notnull"`
-	State   GameState `pg:"type:carchar(25),default:off,notnull"`
+	State   GameState `pg:"type:varchar(25),default:off,notnull"`
+}
+
+func (g *Game) GetResourceName() string {
+	return fmt.Sprintf("%s.%s", g.UserID.String(), g.Name)
 }

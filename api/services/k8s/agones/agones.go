@@ -10,6 +10,7 @@ import (
 	v1Informers "agones.dev/agones/pkg/client/informers/externalversions/agones/v1"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -17,7 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	gamev1Resource "agones-minecraft/resources/api/v1/game"
 	k8s "agones-minecraft/services/k8s"
 )
 
@@ -93,6 +93,18 @@ func (c *AgonesClient) Get(serverName string) (*agonesv1.GameServer, error) {
 	return c.informer.Lister().GameServers(metav1.NamespaceDefault).Get(serverName)
 }
 
+// Get gameserver by name and check if the provided userId matches the userId label on the resource
+// If user does not match label on resourece it returns a not found k8s api error
+func (c *AgonesClient) GetForUser(serverName string, userId uuid.UUID) (*agonesv1.GameServer, error) {
+	gs, err := c.Get(serverName)
+
+	if GetUserId(gs) != userId.String() {
+		return nil, k8sErrors.NewNotFound(agonesv1.Resource("GameServer"), serverName)
+	}
+
+	return gs, err
+}
+
 // Gets all GameServers for default namespace
 func (c *AgonesClient) List() ([]*agonesv1.GameServer, error) {
 	return c.informer.Lister().GameServers(metav1.NamespaceDefault).List(labels.Everything())
@@ -139,30 +151,7 @@ func (c *AgonesClient) ListRecords() []string {
 	return c.recordStore.List()
 }
 
-func (c *AgonesClient) HostnameAvailable(domain, subdomain string) bool {
-	hostname := fmt.Sprintf("%s.%s", subdomain, domain)
-	_, ok := c.recordStore.Get(hostname)
+func (c *AgonesClient) AddressAvailable(address string) bool {
+	_, ok := c.recordStore.Get(address)
 	return !ok
-}
-
-func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
-	gs, err := Client().Get(name)
-	if err != nil {
-		return err
-	}
-	hostname := GetHostname(gs)
-	userId := uuid.MustParse(GetUserId(gs))
-
-	*game = gamev1Resource.GameStatus{
-		ID:       GetUID(gs),
-		UserID:   userId,
-		Name:     gs.Name,
-		Status:   GetStatus(gs),
-		Edition:  GetEdition(gs),
-		Hostname: &hostname,
-		Address:  GetAddress(gs),
-		Port:     GetPort(gs),
-	}
-
-	return nil
 }

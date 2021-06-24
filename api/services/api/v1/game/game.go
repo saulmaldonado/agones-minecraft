@@ -4,10 +4,13 @@ import (
 	"agones-minecraft/db"
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
-	v1 "agones.dev/agones/pkg/apis/agones/v1"
+	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"github.com/go-pg/pg/v10"
 	"github.com/google/uuid"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	gamev1Model "agones-minecraft/models/v1/game"
 	gamev1Resource "agones-minecraft/resources/api/v1/game"
@@ -27,85 +30,150 @@ type ErrDeletingGameFromDB struct {
 	error
 }
 
-func GetGameById(game *gamev1Model.Game, id uuid.UUID) error {
-	game.ID = id
-	return db.DB().Model(game).WherePK().First()
-}
-
-func GetGameByName(game *gamev1Model.Game, name string) error {
-	return db.DB().Model(game).Where("name = ?", name).First()
-}
-
-func ListGamesForUser(games *[]*gamev1Model.Game, userId uuid.UUID) error {
-	return db.DB().Model(games).Where("user_id = ?", userId).Select()
-}
-
-func GetGameStatusByName(game *gamev1Resource.GameStatus, name string) error {
-	var foundGame gamev1Model.Game
-	if err := GetGameByName(&foundGame, name); err != nil {
-		return err
-	}
-
-	*game = gamev1Resource.GameStatus{
-		ID:      foundGame.ID,
-		Name:    foundGame.Name,
-		Status:  gamev1Resource.Offline,
-		Edition: foundGame.Edition,
-	}
-
-	return nil
-}
-
-func GetGameByUserIdAndName(game *gamev1Model.Game, userId uuid.UUID, name string) error {
-	return db.DB().Model(game).Where("name = ? AND user_id = ?", name, userId).First()
-}
-
-func CreateGame(game *gamev1Model.Game, gs *v1.GameServer) error {
+func GetGameById(game *gamev1Resource.Game, id uuid.UUID) error {
 	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
-		if ok := agones.Client().HostnameAvailable(agones.GetDNSZone(), game.Address); !ok {
-			return ErrSubdomainTaken
-		}
-		agones.SetHostname(gs, agones.GetDNSZone(), game.Address)
+		var foundGame gamev1Model.Game
 
-		gameServer, err := agones.Client().CreateDryRun(gs)
+		game.ID = id
+		if err := tx.Model(game).WherePK().First(); err != nil {
+			return err
+		}
+
+		gs, err := agones.Client().Get(foundGame.GetResourceName())
+		if err == nil {
+			return reconcileGameState(tx, &foundGame, gs)
+		} else if !k8sErrors.IsNotFound(err) {
+			return err
+		}
+
+		game.MergeGame(&foundGame, gs)
+
+		return nil
+	})
+}
+
+func GetGameByNameAndUserId(game *gamev1Resource.Game, name string, userId uuid.UUID) error {
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		var foundGame gamev1Model.Game
+
+		if err := getByNameAndUserId(tx, &foundGame, name, userId); err != nil {
+			if err == pg.ErrNoRows {
+				return ErrGameServerNotFound
+			}
+			return err
+		}
+
+		gs, err := agones.Client().GetForUser(foundGame.GetResourceName(), userId)
+		if err != nil {
+			if !k8sErrors.IsNotFound(err) {
+				return err
+			}
+		}
+
+		if err := reconcileGameState(tx, &foundGame, gs); err != nil {
+			return err
+		}
+
+		game.MergeGame(&foundGame, gs)
+		return nil
+	})
+}
+
+func ListGamesForUser(games *[]*gamev1Resource.Game, userId uuid.UUID) error {
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		foundGames := []*gamev1Model.Game{}
+		err := tx.Model(&foundGames).Where("user_id = ?", userId).Select()
+		if err != nil {
+			if err != pg.ErrNoRows {
+				return err
+			}
+		}
+
+		gsList, err := agones.Client().ListGamesForUser(userId.String())
 		if err != nil {
 			return err
 		}
 
-		// point to newly created gameserver obj
-		*gs = *gameServer
-
-		game.ID = uuid.MustParse(string(gs.UID))
-		game.Name = gs.Name
-		game.State = gamev1Model.On
-
-		if _, err := db.DB().Model(game).Insert(); err != nil {
+		if err := reconcileGameListStates(tx, foundGames, gsList); err != nil {
 			return err
 		}
 
-		if _, err := agones.Client().Create(gs); err != nil {
-			return err
+		listedGames := make(map[string]*agonesv1.GameServer)
+		for _, gs := range gsList {
+			listedGames[agones.GetUUID(gs).String()] = gs
+		}
+
+		for _, foundGame := range foundGames {
+			game := gamev1Resource.Game{}
+			fmt.Println(listedGames)
+			listedGame := listedGames[foundGame.ID.String()]
+			game.MergeGame(foundGame, listedGame)
+			*games = append(*games, &game)
 		}
 
 		return nil
 	})
 }
 
-func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {
+func CreateGame(game *gamev1Resource.Game, edition gamev1Model.Edition, body gamev1Resource.CreateGameBody, userId uuid.UUID) error {
 	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
-		if err := GetGameByUserIdAndName(game, userId, name); err != nil {
+		if !agones.Client().AddressAvailable(body.Subdomain) {
+			return ErrSubdomainTaken
+		}
+
+		var gs *agonesv1.GameServer
+
+		switch edition {
+		case gamev1Model.BedrockEdition:
+			gs = agones.NewBedrockServer()
+		default:
+			gs = agones.NewJavaServer()
+		}
+
+		agones.SetName(gs, userId, body.Name) // Set cluster unique GameServer name
+
+		gameModel := gamev1Model.Game{
+			Name:    agones.GetName(gs),
+			State:   gamev1Model.On,
+			Address: agones.NewAddress(body.Subdomain),
+			UserID:  userId,
+			Edition: gamev1Model.JavaEdition,
+		}
+
+		if _, err := tx.Model(&gameModel).Insert(); err != nil {
+			return err
+		}
+
+		agones.SetUserId(gs, userId)                                // Set userId label
+		agones.SetHostname(gs, agones.GetDNSZone(), body.Subdomain) // Set externalDNS annoataions
+		agones.SetUUID(gs, gameModel.ID)                            // Set record uuid label
+
+		newGs, err := agones.Client().Create(gs)
+		if err != nil {
+			return err
+		}
+
+		game.MergeGame(&gameModel, newGs)
+
+		return nil
+	})
+}
+
+func DeleteGame(userId uuid.UUID, name string) error {
+	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
+		var foundGame gamev1Model.Game
+		if err := getByNameAndUserId(tx, &foundGame, name, userId); err != nil {
 			if err == pg.ErrNoRows {
 				return ErrGameServerNotFound
 			}
-
 			return &ErrDeletingGameFromDB{err}
 		}
 
-		if _, err := db.DB().Model(game).Delete(); err != nil {
+		if _, err := tx.Model(&foundGame).WherePK().Delete(); err != nil {
 			return &ErrDeletingGameFromDB{err}
 		}
 
-		if err := agones.Client().Delete(name); err != nil {
+		if err := agones.Client().Delete(foundGame.GetResourceName()); err != nil {
 			return &ErrDeletingGameFromK8S{err}
 		}
 
@@ -116,4 +184,50 @@ func DeleteGame(game *gamev1Model.Game, userId uuid.UUID, name string) error {
 func UpdateGame(game *gamev1Model.Game) error {
 	_, err := db.DB().Model(game).WherePK().Update()
 	return err
+}
+
+// Reconcile game state in database to match the state in cluster
+func reconcileGameState(tx *pg.Tx, game *gamev1Model.Game, gs *agonesv1.GameServer) error {
+	realState := agones.GetState(gs)
+	var err error
+	if realState != game.State {
+		_, err = tx.Model(game).
+			Set("state = ?", realState).
+			Set("updated_at = ?", time.Now()).
+			WherePK().
+			Update()
+	}
+	return err
+}
+
+// Bulk reconcile game states in database to match the game states in the cluster
+func reconcileGameListStates(tx *pg.Tx, games []*gamev1Model.Game, gsList []*agonesv1.GameServer) error {
+	updates := []*gamev1Model.Game{}
+	now := time.Now()
+	realStates := make(map[string]gamev1Model.GameState)
+
+	for _, gs := range gsList {
+		realStates[agones.GetUUID(gs).String()] = agones.GetState(gs)
+	}
+
+	for _, game := range games {
+		if game.State != realStates[game.ID.String()] {
+			game.State = realStates[game.ID.String()]
+			game.UpdatedAt = now
+		}
+	}
+
+	if len(updates) > 0 {
+		_, err := tx.Model(&updates).Column("state", "updated_at").Update()
+		return err
+	}
+
+	return nil
+}
+
+func getByNameAndUserId(tx *pg.Tx, game *gamev1Model.Game, name string, userId uuid.UUID) error {
+	return tx.Model(game).
+		Where("name = ?", name).
+		Where("user_id = ?", userId).
+		First()
 }

@@ -85,13 +85,13 @@ func AddV1Router(r *gin.Engine) {
 
 	game := v1.Group("/game")
 	{
-		game.GET("", session.Authorizer(), v1Controllers.ListGamesForUser)
-		game.GET("/:name/status", session.Authenticator(), v1Controllers.GetGameState)
+		game.Use(session.Authorizer())
+		game.GET("/list", v1Controllers.ListGamesForUser)
 		game.GET("/:name", v1Controllers.GetGame)
 
-		game.Use(session.Authorizer())
 		game.POST("/java", v1Controllers.CreateJava)
 		game.POST("/bedrock", v1Controllers.CreateBedrock)
+
 		game.DELETE("/:name", v1Controllers.DeleteGame)
 	}
 }

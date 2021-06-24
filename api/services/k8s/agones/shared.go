@@ -2,12 +2,12 @@ package agones
 
 import (
 	"fmt"
+	"strings"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"github.com/google/uuid"
 
 	"agones-minecraft/config"
-	"agones-minecraft/resources/api/v1/game"
 
 	gamev1Model "agones-minecraft/models/v1/game"
 )
@@ -55,7 +55,13 @@ const (
 
 	EditionLabel string = "edition"
 	UserIdLabel  string = "userId"
+	UUIDLabel    string = "uuid"
 )
+
+func NewAddress(subdomain string) string {
+	domain := config.GetDNSZone()
+	return fmt.Sprintf("%s.%s", subdomain, domain)
+}
 
 func SetHostname(gs *agonesv1.GameServer, domain, subdomain string) {
 	anno := gs.GetAnnotations()
@@ -82,13 +88,31 @@ func GetHostname(gs *agonesv1.GameServer) string {
 	return fmt.Sprintf("%s.%s", subdomain, domain)
 }
 
-func GetStatus(gs *agonesv1.GameServer) game.Status {
-	if IsOnline(gs) {
-		return game.Online
-	} else if IsStarting(gs) {
-		return game.Starting
+func SetName(gs *agonesv1.GameServer, userId uuid.UUID, name string) {
+	gs.Name = fmt.Sprintf("%s.%s", userId.String(), name)
+}
+
+func GetName(gs *agonesv1.GameServer) string {
+	return strings.TrimPrefix(strings.TrimLeft(gs.Name, "0123456789abcdef-"), ".")
+}
+
+func GetState(gs *agonesv1.GameServer) gamev1Model.GameState {
+	if IsOnline(gs) || IsStarting(gs) {
+		return gamev1Model.On
 	}
-	return game.Stopping
+	return gamev1Model.Off
+}
+
+func GetStatus(gs *agonesv1.GameServer) *agonesv1.GameServerState {
+	return &gs.Status.State
+}
+
+func SetUUID(gs *agonesv1.GameServer, uuid uuid.UUID) {
+	gs.Labels[UUIDLabel] = uuid.String()
+}
+
+func GetUUID(gs *agonesv1.GameServer) uuid.UUID {
+	return uuid.MustParse(gs.Labels[UUIDLabel])
 }
 
 func GetDNSZone() string {
@@ -101,10 +125,6 @@ func GetUserId(gs *agonesv1.GameServer) string {
 
 func SetUserId(gs *agonesv1.GameServer, userId uuid.UUID) {
 	gs.Labels[UserIdLabel] = userId.String()
-}
-
-func GetUID(gs *agonesv1.GameServer) uuid.UUID {
-	return uuid.MustParse(string(gs.UID))
 }
 
 func GetEdition(gs *agonesv1.GameServer) gamev1Model.Edition {
