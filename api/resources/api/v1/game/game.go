@@ -30,6 +30,8 @@ type Game struct {
 	Name      string                    `json:"name"`
 	Edition   gamev1Model.Edition       `json:"edition"`
 	State     gamev1Model.GameState     `json:"state,omitempty"`
+	MOTD      string                    `json:"motd"`
+	Slots     int                       `json:"slots"`
 	Status    *agonesv1.GameServerState `json:"status"`
 	Address   string                    `json:"address"`
 	Port      *int32                    `json:"port,omitempty"`
@@ -46,6 +48,8 @@ func (game *Game) MergeGame(gameModel *gamev1Model.Game, gs *agonesv1.GameServer
 		game.Address = gameModel.Address
 		game.Edition = gameModel.Edition
 		game.State = gameModel.State
+		game.MOTD = gameModel.MOTD
+		game.Slots = gameModel.Slots
 		game.CreatedAt = gameModel.CreatedAt
 	}
 
