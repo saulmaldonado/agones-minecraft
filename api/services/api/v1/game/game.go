@@ -1,6 +1,7 @@
 package game
 
 import (
+	"agones-minecraft/config"
 	"agones-minecraft/db"
 	"context"
 	"errors"
@@ -18,7 +19,7 @@ import (
 )
 
 var (
-	ErrSubdomainTaken     error = errors.New("custom subdomain not available")
+	ErrSubdomainTaken     error = errors.New("subdomain not available")
 	ErrGameServerNotFound error = errors.New("game server not found")
 )
 
@@ -117,7 +118,10 @@ func ListGamesForUser(games *[]*gamev1Resource.Game, userId uuid.UUID) error {
 
 func CreateGame(game *gamev1Resource.Game, edition gamev1Model.Edition, body gamev1Resource.CreateGameBody, userId uuid.UUID) error {
 	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
-		if !agones.Client().AddressAvailable(body.Subdomain) {
+		ok, err := addressIsTaken(tx, body.Subdomain)
+		if err != nil {
+			return err
+		} else if ok {
 			return ErrSubdomainTaken
 		}
 
@@ -230,4 +234,9 @@ func getByNameAndUserId(tx *pg.Tx, game *gamev1Model.Game, name string, userId u
 		Where("name = ?", name).
 		Where("user_id = ?", userId).
 		First()
+}
+
+func addressIsTaken(tx *pg.Tx, subdomain string) (bool, error) {
+	address := fmt.Sprintf("%s.%s", subdomain, config.GetDNSZone())
+	return tx.Model((*gamev1Model.Game)(nil)).Where("address = ?", address).Exists()
 }

@@ -25,9 +25,8 @@ var agonesClient *AgonesClient
 
 // Agones clientset wrapper
 type AgonesClient struct {
-	clientSet   *versioned.Clientset
-	informer    v1Informers.GameServerInformer
-	recordStore GameServerDNSRecordStore
+	clientSet *versioned.Clientset
+	informer  v1Informers.GameServerInformer
 }
 
 // Timeout for connecting to k8s server
@@ -66,9 +65,8 @@ func New(config *rest.Config) (*AgonesClient, error) {
 		return nil, err
 	}
 	gameServerInformer := NewGameServerInformer(agonesClient)
-	recordStore := NewGameServerDNSRecordStore(gameServerInformer)
 
-	return &AgonesClient{agonesClient, gameServerInformer, recordStore}, nil
+	return &AgonesClient{agonesClient, gameServerInformer}, nil
 }
 
 func (c *AgonesClient) Ping() error {
@@ -145,13 +143,4 @@ func (c *AgonesClient) Delete(serverName string) error {
 		AgonesV1().
 		GameServers(metav1.NamespaceDefault).
 		Delete(context.Background(), serverName, metav1.DeleteOptions{})
-}
-
-func (c *AgonesClient) ListRecords() []string {
-	return c.recordStore.List()
-}
-
-func (c *AgonesClient) AddressAvailable(address string) bool {
-	_, ok := c.recordStore.Get(address)
-	return !ok
 }

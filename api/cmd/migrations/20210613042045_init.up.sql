@@ -61,3 +61,5 @@ CREATE TABLE IF NOT EXISTS games (
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS games_address_key ON games (address) WHERE deleted_at IS NULL;
