@@ -1,7 +1,6 @@
 package game
 
 import (
-	"agones-minecraft/config"
 	"agones-minecraft/db"
 	"context"
 	"errors"
@@ -19,8 +18,9 @@ import (
 )
 
 var (
-	ErrSubdomainTaken     error = errors.New("subdomain not available")
-	ErrGameServerNotFound error = errors.New("game server not found")
+	ErrSubdomainTaken      error = errors.New("subdomain not available")
+	ErrGameServerNameTaken error = errors.New("game server name not available")
+	ErrGameServerNotFound  error = errors.New("game server not found")
 )
 
 type ErrDeletingGameFromK8S struct {
@@ -118,13 +118,6 @@ func ListGamesForUser(games *[]*gamev1Resource.Game, userId uuid.UUID) error {
 
 func CreateGame(game *gamev1Resource.Game, edition gamev1Model.Edition, body gamev1Resource.CreateGameBody, userId uuid.UUID) error {
 	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
-		ok, err := addressIsTaken(tx, body.Subdomain)
-		if err != nil {
-			return err
-		} else if ok {
-			return ErrSubdomainTaken
-		}
-
 		var gs *agonesv1.GameServer
 
 		switch edition {
@@ -142,6 +135,20 @@ func CreateGame(game *gamev1Resource.Game, edition gamev1Model.Edition, body gam
 			Address: agones.NewAddress(body.Subdomain),
 			UserID:  userId,
 			Edition: gamev1Model.JavaEdition,
+		}
+
+		ok, err := addressIsTaken(tx, &gameModel)
+		if err != nil {
+			return err
+		} else if ok {
+			return ErrSubdomainTaken
+		}
+
+		ok, err = nameIsTaken(tx, &gameModel)
+		if err != nil {
+			return err
+		} else if ok {
+			return ErrGameServerNameTaken
 		}
 
 		if _, err := tx.Model(&gameModel).Insert(); err != nil {
@@ -236,7 +243,14 @@ func getByNameAndUserId(tx *pg.Tx, game *gamev1Model.Game, name string, userId u
 		First()
 }
 
-func addressIsTaken(tx *pg.Tx, subdomain string) (bool, error) {
-	address := fmt.Sprintf("%s.%s", subdomain, config.GetDNSZone())
-	return tx.Model((*gamev1Model.Game)(nil)).Where("address = ?", address).Exists()
+func addressIsTaken(tx *pg.Tx, game *gamev1Model.Game) (bool, error) {
+	return tx.Model((*gamev1Model.Game)(nil)).
+		Where("address = ?", game.GetResourceName()).
+		Exists()
+}
+
+func nameIsTaken(tx *pg.Tx, game *gamev1Model.Game) (bool, error) {
+	return tx.Model((*gamev1Model.Game)(nil)).
+		Where("name = ?", game.Name).
+		Exists()
 }

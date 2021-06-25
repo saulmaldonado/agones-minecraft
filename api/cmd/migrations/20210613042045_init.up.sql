@@ -63,3 +63,4 @@ CREATE TABLE IF NOT EXISTS games (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS games_address_key ON games (address) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS games_name_user_id_key ON games (name, user_id) WHERE deleted_at IS NULL;

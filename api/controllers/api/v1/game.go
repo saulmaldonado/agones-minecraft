@@ -78,6 +78,8 @@ func CreateJava(c *gin.Context) {
 	if err := gamev1Service.CreateGame(&game, gamev1Model.JavaEdition, body, userId); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
 			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrSubdomainTaken))
+		} else if err == gamev1Service.ErrGameServerNameTaken {
+			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrGameServerNameTaken))
 		} else {
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrCreatingGame))
 		}
@@ -106,9 +108,11 @@ func CreateBedrock(c *gin.Context) {
 
 	var game gamev1Resource.Game
 
-	if err := gamev1Service.CreateGame(&game, gamev1Model.BedrockEdition, body, userId); err != nil {
+	if err := gamev1Service.CreateGame(&game, gamev1Model.JavaEdition, body, userId); err != nil {
 		if err == gamev1Service.ErrSubdomainTaken {
 			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrSubdomainTaken))
+		} else if err == gamev1Service.ErrGameServerNameTaken {
+			c.Error(apiErr.NewBadRequestError(err, v1Err.ErrGameServerNameTaken))
 		} else {
 			c.Error(apiErr.NewInternalServerError(err, v1Err.ErrCreatingGame))
 		}

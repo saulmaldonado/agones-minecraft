@@ -93,6 +93,8 @@ const (
 	ErrCreateGameServerValidation ErrorID = "6163"
 	// subdomain taken error
 	ErrSubdomainTaken ErrorID = "710c"
+	// game server name taken
+	ErrGameServerNameTaken ErrorID = "dbec"
 	// error creating game
 	ErrCreatingGame ErrorID = "8410"
 	// error deleting game from k8s
