@@ -3,27 +3,41 @@ package agones
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"agones-minecraft/config"
 
 	gamev1Model "agones-minecraft/models/v1/game"
 )
 
+type Edition string
+
 const (
+	// Minecraft java server edition
+	JavaEdition Edition = "java"
+	// Minecraft bedrock sever edition
+	BedrockEdition Edition = "bedrock"
 
 	// GameServer Spec
+	DefaultBedrockContainerPort int32 = 19132
+	DefaultJavaContainerPort    int32 = 25565
 
 	DefaultGenerateName            string = "mc-server-"
 	DefaultGameServerContainerName string = "mc-server"
 
-	// Health
+	DefaultBedrockImage string = "saulmaldonado/minecraft-bedrock-server"
+	DefaultJavaImage    string = "itzg/minecraft-server"
+	JavaSRVServiceName  string = "minecraft"
 
-	DefaultInitialDelay     int32 = 60
-	DefaultPeriodSeconds    int32 = 12
-	DefaultFailureThreshold int32 = 5
+	// health
+
+	DefaultInitialDelaySeconds int32 = 60
+	DefaultHealthPeriodSeconds int32 = 12
 
 	// Pod Template
 
@@ -37,9 +51,8 @@ const (
 
 	// mc-backup
 
-	MCBackupImageName         string = "saulmaldonado/agones-mc"
-	MCBackupDefaultBucketName string = "agones-minecraft-mc-worlds"
-	DefaultMCBackupCron       string = "0 */6 * * *"
+	MCBackupImageName   string = "saulmaldonado/agones-mc"
+	DefaultMCBackupCron string = "0 */6 * * *"
 
 	// volumes
 
@@ -56,10 +69,41 @@ const (
 	EditionLabel string = "edition"
 	UserIdLabel  string = "userId"
 	UUIDLabel    string = "uuid"
+
+	// env names
+
+	initialDelay string = "INITIAL_DELAY"
+	host         string = "HOST"
+	port         string = "PORT"
+	edition      string = "EDITION"
+	interval     string = "INTERVAL"
+	timeout      string = "TIMEOUT"
+	maxAttempts  string = "MAX_ATTEMPTS"
+	podName      string = "POD_NAME"
+	rconPassword string = "RCON_PASSWORD"
+	rconPort     string = "RCON_PORT"
+	backupCron   string = "BACKUP_CRON"
+	bucketName   string = "BUCKET_NAME"
+)
+
+var (
+	// health
+
+	DefaultInitialDelay     time.Duration = time.Second * (2)
+	DefaultFailureThreshold int32         = 5
+
+	DefaultHealthInterval  time.Duration = (time.Second * time.Duration(DefaultHealthPeriodSeconds)) - (time.Second * 2)
+	DefaultTimeoutDuration time.Duration = (time.Second * time.Duration(DefaultHealthPeriodSeconds)) - (time.Second * 2)
 )
 
 func NewAddress(subdomain string) string {
 	domain := config.GetDNSZone()
+	return fmt.Sprintf("%s.%s", subdomain, domain)
+}
+
+func GetAddress(gs *agonesv1.GameServer) string {
+	domain := gs.Annotations[HostnameAnnotation]
+	subdomain := gs.Annotations[CustomSubdomainAnnotation]
 	return fmt.Sprintf("%s.%s", subdomain, domain)
 }
 
@@ -131,11 +175,8 @@ func GetEdition(gs *agonesv1.GameServer) gamev1Model.Edition {
 	return gamev1Model.Edition(gs.Annotations[EditionLabel])
 }
 
-func GetAddress(gs *agonesv1.GameServer) *string {
-	if IsOnline(gs) {
-		return &gs.Status.Address
-	}
-	return nil
+func SetEdition(gs *agonesv1.GameServer, edition Edition) {
+	gs.Annotations[EditionLabel] = string(edition)
 }
 
 func GetPort(gs *agonesv1.GameServer) *int32 {
@@ -162,4 +203,96 @@ func IsBeforePodCreated(gs *agonesv1.GameServer) bool {
 	return state == agonesv1.GameServerStatePortAllocation ||
 		state == agonesv1.GameServerStateCreating ||
 		state == agonesv1.GameServerStateStarting
+}
+
+func newServer() agonesv1.GameServer {
+	return agonesv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   metav1.NamespaceDefault,
+			Annotations: map[string]string{},
+			Labels:      map[string]string{},
+		},
+		Spec: agonesv1.GameServerSpec{
+			Container: DefaultGameServerContainerName,
+			Ports: []agonesv1.GameServerPort{{
+				Name:       "mc",
+				PortPolicy: agonesv1.Dynamic,
+			}},
+			Health: agonesv1.Health{
+				InitialDelaySeconds: DefaultInitialDelaySeconds,
+				PeriodSeconds:       DefaultHealthPeriodSeconds,
+				FailureThreshold:    DefaultFailureThreshold,
+			},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            DefaultGameServerContainerName,
+							ImagePullPolicy: corev1.PullAlways,
+							Env: []corev1.EnvVar{
+								{Name: "EULA", Value: "TRUE"},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: DefaultDataDirectory, Name: DefaultDataVolumeName},
+							},
+							Ports: []corev1.ContainerPort{
+								{ContainerPort: 25575},
+							},
+						},
+						{
+							Name:  "mc-monitor",
+							Image: MCMonitorImageName,
+							Args:  []string{"monitor"},
+
+							Env: []corev1.EnvVar{
+								{Name: maxAttempts, Value: string(DefaultFailureThreshold)},
+								{Name: initialDelay, Value: DefaultInitialDelay.String()},
+								{Name: interval, Value: DefaultHealthInterval.String()},
+								{Name: timeout, Value: DefaultTimeoutDuration.String()},
+							},
+
+							ImagePullPolicy: corev1.PullAlways,
+						},
+						{
+							Name:  "mc-backup",
+							Image: MCMonitorImageName,
+							Args:  []string{"backup"},
+							Env: []corev1.EnvVar{
+								{
+									Name: podName, ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								{
+									Name:  rconPassword,
+									Value: DefaultRCONPassword,
+								},
+								{Name: initialDelay, Value: DefaultInitialDelay.String()},
+								{Name: backupCron, Value: DefaultMCBackupCron},
+								{Name: bucketName, Value: config.GetBucketName()},
+							},
+							ImagePullPolicy: corev1.PullAlways,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: DefaultDataDirectory,
+									Name:      DefaultDataVolumeName,
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: DefaultDataVolumeName,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 }

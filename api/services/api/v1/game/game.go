@@ -13,6 +13,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	gamev1Model "agones-minecraft/models/v1/game"
+	"agones-minecraft/models/v1/model"
 	gamev1Resource "agones-minecraft/resources/api/v1/game"
 	"agones-minecraft/services/k8s/agones"
 )
@@ -120,19 +121,24 @@ func CreateGame(game *gamev1Resource.Game, edition gamev1Model.Edition, body gam
 	return db.DB().RunInTransaction(context.Background(), func(tx *pg.Tx) error {
 		var gs *agonesv1.GameServer
 
+		var builder agones.MCServerBuilder
+
 		switch edition {
-		case gamev1Model.BedrockEdition:
-			gs = agones.NewBedrockServer()
-		default:
-			gs = agones.NewJavaServer()
+		case gamev1Model.Edition(agones.JavaEdition):
+			builder = agones.NewJavaServerBuilder()
+		case gamev1Model.Edition(agones.BedrockEdition):
+			builder = agones.NewBedrockServerBuilder()
 		}
 
-		agones.SetName(gs, userId, body.Name) // Set cluster unique GameServer name
+		uuid := uuid.New()
+
+		gs = agones.NewDirector(builder).BuildServer(body.Name, body.Subdomain, uuid, userId)
 
 		gameModel := gamev1Model.Game{
+			Model:   model.Model{ID: uuid},
 			Name:    agones.GetName(gs),
 			State:   gamev1Model.On,
-			Address: agones.NewAddress(body.Subdomain),
+			Address: agones.GetAddress(gs),
 			UserID:  userId,
 			Edition: gamev1Model.JavaEdition,
 		}
@@ -154,10 +160,6 @@ func CreateGame(game *gamev1Resource.Game, edition gamev1Model.Edition, body gam
 		if _, err := tx.Model(&gameModel).Insert(); err != nil {
 			return err
 		}
-
-		agones.SetUserId(gs, userId)                                // Set userId label
-		agones.SetHostname(gs, agones.GetDNSZone(), body.Subdomain) // Set externalDNS annoataions
-		agones.SetUUID(gs, gameModel.ID)                            // Set record uuid label
 
 		newGs, err := agones.Client().Create(gs)
 		if err != nil {

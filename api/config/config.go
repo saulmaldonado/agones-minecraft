@@ -24,6 +24,7 @@ const (
 	REDIS_PASSWORD       = "REDIS_PASSWORD"
 	JWT_SECRET           = "JWT_SECRET"
 	DNS_ZONE             = "DNS_ZONE"
+	BUCKET_NAME          = "BUCKET_NAME"
 )
 
 const (
@@ -140,4 +141,8 @@ func GetRedisCreds() *RedisConfig {
 // Returns DNS zone
 func GetDNSZone() string {
 	return viper.GetString(DNS_ZONE)
+}
+
+func GetBucketName() string {
+	return viper.GetString(BUCKET_NAME)
 }
