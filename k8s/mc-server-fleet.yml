@@ -55,27 +55,37 @@ spec:
                 - mountPath: /data # shared vol with mc-load and mc-backup
                   name: world-vol
               ports:
-              - containerPort: 25575 # exposes the RCON port to within the cluster from the pod's IP
+                - containerPort: 25575 # exposes the RCON port to within the cluster from the pod's IP
 
             - name: mc-monitor
               image: saulmaldonado/agones-mc # monitor
               args:
                 - monitor
-                - --attempts=5 # matches spec.health.failureThreshold
-                - --initial-delay=60s # matches spec.health.initialDelaySeconds
-                - --interval=10s # below spec.health.periodSecond
-                - --timeout=10s # matches interval
+              env:
+                - name: INITIAL_DELAY
+                  value: "30s"
+                - name: MAX_ATTEMPTS
+                  value: "5"
+                - name: INTERVAL
+                  value: "10s"
+                - name: TIMEOUT
+                  value: "10s"
               imagePullPolicy: Always
 
             - name: mc-backup
               image: saulmaldonado/agones-mc # backup
               args:
                 - backup
-                - --gcp-bucket-name=agones-minecraft-mc-worlds # GCP Cloud storage bucket name for world archives
-                - --backup-cron=0 */6 * * * # crontab for recurring backups. omiting flag will only run backup once
-                - --initial-delay=60s # delay for mc-server to build world before scheduling backup jobs
               env:
-                - name: NAME
+                - name: BUCKET_NAME
+                  value: "agones-minecraft-mc-worlds"
+                - name: BACKUP_CRON
+                  value: "0 */6 * * *"
+                - name: INITIAL_DELAY
+                  value: "60s"
+                - name: VOLUME
+                  value: "/data"
+                - name: POD_NAME
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name # GameServer ref for naming backup zip files
