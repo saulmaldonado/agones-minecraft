@@ -55,7 +55,7 @@ spec:
                 - mountPath: /data # shared vol with mc-load and mc-backup
                   name: world-vol
               ports:
-                - containerPort: 25575 # exposes the RCON port to within the cluster from the pod's IP
+              - containerPort: 25575 # exposes the RCON port to within the cluster from the pod's IP
 
             - name: mc-monitor
               image: saulmaldonado/agones-mc # monitor
